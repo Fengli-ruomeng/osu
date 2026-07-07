@@ -5,8 +5,10 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
+using System.Threading.Tasks;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
+using osu.Framework.Extensions;
 using osu.Framework.Extensions.Color4Extensions;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Colour;
@@ -59,10 +61,16 @@ namespace osu.Game.Screens.Select
         private BeatmapDifficultyCache difficultyCache { get; set; } = null!;
 
         [Resolved]
+        private BeatmapManager beatmaps { get; set; } = null!;
+
+        [Resolved]
         private IBindable<RulesetInfo> ruleset { get; set; } = null!;
 
         [Resolved]
         private IBindable<IReadOnlyList<Mod>> mods { get; set; } = null!;
+
+        [Resolved(canBeNull: true)]
+        private PracticeModeState? practiceMode { get; set; }
 
         [Resolved]
         private ISongSelect? songSelect { get; set; }
@@ -196,6 +204,10 @@ namespace osu.Game.Screens.Select
         {
             base.LoadComplete();
 
+            practiceMode?.Enabled.BindValueChanged(_ => computeStarRating(), true);
+            practiceMode?.StartTime.BindValueChanged(_ => computeStarRating(), true);
+            ruleset.BindValueChanged(_ => computeStarRating());
+            mods.BindValueChanged(_ => computeStarRating());
             ruleset.BindValueChanged(_ => updateKeyCount());
             mods.BindValueChanged(_ => updateKeyCount(), true);
         }
@@ -241,6 +253,27 @@ namespace osu.Game.Screens.Select
 
             if (Item == null)
                 return;
+
+            if (practiceMode?.Enabled.Value == true)
+            {
+                var targetBeatmap = beatmap;
+                var cancellationSource = starDifficultyCancellationSource;
+                starRatingDisplay.Current.Value = new StarDifficulty(-1, 0);
+                starCounter.Current = -1;
+
+                difficultyCache.GetPracticeDifficultyAsync(beatmaps.GetWorkingBeatmap(targetBeatmap), ruleset.Value, mods.Value, practiceMode.StartTime.Value, cancellationSource.Token)
+                               .ContinueWith(task => Schedule(() =>
+                               {
+                                   if (cancellationSource.IsCancellationRequested || Item == null || !beatmap.Equals(targetBeatmap))
+                                       return;
+
+                                   var starDifficulty = task.GetResultSafely() ?? new StarDifficulty(-1, 0);
+                                   starRatingDisplay.Current.Value = starDifficulty;
+                                   starCounter.Current = (float)starDifficulty.Stars;
+                               }), TaskContinuationOptions.OnlyOnRanToCompletion);
+
+                return;
+            }
 
             starDifficultyBindable = difficultyCache.GetBindableDifficulty(beatmap, starDifficultyCancellationSource.Token, SongSelect.DIFFICULTY_CALCULATION_DEBOUNCE);
             starDifficultyBindable.BindValueChanged(starDifficulty =>

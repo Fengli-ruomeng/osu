@@ -32,8 +32,7 @@ namespace osu.Game.Screens.Select
 {
     public partial class FooterButtonPractice : ScreenFooterButton, IHasPopover
     {
-        private readonly BindableBool practiceEnabled;
-        private readonly BindableDouble practiceStartTime;
+        private readonly PracticeModeState practiceMode;
 
         [Resolved]
         private OverlayColourProvider colourProvider { get; set; } = null!;
@@ -41,10 +40,9 @@ namespace osu.Game.Screens.Select
         [Resolved]
         private IBindable<WorkingBeatmap> workingBeatmap { get; set; } = null!;
 
-        public FooterButtonPractice(BindableBool practiceEnabled, BindableDouble practiceStartTime)
+        public FooterButtonPractice(PracticeModeState practiceMode)
         {
-            this.practiceEnabled = practiceEnabled;
-            this.practiceStartTime = practiceStartTime;
+            this.practiceMode = practiceMode;
         }
 
         [BackgroundDependencyLoader]
@@ -68,7 +66,7 @@ namespace osu.Game.Screens.Select
             base.LoadComplete();
 
             workingBeatmap.BindValueChanged(_ => updateDuration(), true);
-            practiceEnabled.BindValueChanged(enabled => OverlayState.Value = enabled.NewValue ? Visibility.Visible : Visibility.Hidden, true);
+            practiceMode.Enabled.BindValueChanged(enabled => OverlayState.Value = enabled.NewValue ? Visibility.Visible : Visibility.Hidden, true);
         }
 
         private void updateDuration()
@@ -91,11 +89,11 @@ namespace osu.Game.Screens.Select
                 maximumPracticeStartTime = Math.Max(0, workingBeatmap.Value.BeatmapInfo.Length - PracticeBeatmapDifficulty.MinimumRemainingGameplayTime);
             }
 
-            practiceStartTime.MaxValue = maximumPracticeStartTime;
-            practiceStartTime.Value = Math.Clamp(practiceStartTime.Value, practiceStartTime.MinValue, practiceStartTime.MaxValue);
+            practiceMode.StartTime.MaxValue = maximumPracticeStartTime;
+            practiceMode.StartTime.Value = Math.Clamp(practiceMode.StartTime.Value, practiceMode.StartTime.MinValue, practiceMode.StartTime.MaxValue);
         }
 
-        public Framework.Graphics.UserInterface.Popover GetPopover() => new Popover(this, practiceEnabled, practiceStartTime)
+        public Framework.Graphics.UserInterface.Popover GetPopover() => new Popover(this, practiceMode)
         {
             ColourProvider = colourProvider,
         };
@@ -103,8 +101,7 @@ namespace osu.Game.Screens.Select
         private partial class Popover : OsuPopover
         {
             private readonly FooterButtonPractice footerButton;
-            private readonly BindableBool practiceEnabled;
-            private readonly BindableDouble practiceStartTime;
+            private readonly PracticeModeState practiceMode;
 
             private OsuSpriteText timeText = null!;
             private TimeSlider slider = null!;
@@ -124,11 +121,10 @@ namespace osu.Game.Screens.Select
 
             public required OverlayColourProvider ColourProvider { get; init; }
 
-            public Popover(FooterButtonPractice footerButton, BindableBool practiceEnabled, BindableDouble practiceStartTime)
+            public Popover(FooterButtonPractice footerButton, PracticeModeState practiceMode)
             {
                 this.footerButton = footerButton;
-                this.practiceEnabled = practiceEnabled;
-                this.practiceStartTime = practiceStartTime;
+                this.practiceMode = practiceMode;
             }
 
             [BackgroundDependencyLoader]
@@ -147,7 +143,7 @@ namespace osu.Game.Screens.Select
                         new OsuCheckbox
                         {
                             LabelText = "Enable",
-                            Current = { BindTarget = practiceEnabled },
+                            Current = { BindTarget = practiceMode.Enabled },
                         },
                         timeText = new OsuSpriteText
                         {
@@ -156,7 +152,7 @@ namespace osu.Game.Screens.Select
                         slider = new TimeSlider
                         {
                             RelativeSizeAxes = Axes.X,
-                            Current = practiceStartTime,
+                            Current = practiceMode.StartTime,
                             AccentColour = colours.Green,
                             BackgroundColour = ColourProvider.Background4.Opacity(0.8f),
                         },
@@ -196,8 +192,8 @@ namespace osu.Game.Screens.Select
             {
                 base.LoadComplete();
 
-                practiceEnabled.BindValueChanged(_ => updateDisplay(), true);
-                practiceStartTime.BindValueChanged(_ => updateDisplay(), true);
+                practiceMode.Enabled.BindValueChanged(_ => updateDisplay(), true);
+                practiceMode.StartTime.BindValueChanged(_ => updateDisplay(), true);
                 footerButton.workingBeatmap.BindValueChanged(_ => queueDifficultyUpdate(), true);
                 ruleset.BindValueChanged(_ => queueDifficultyUpdate(), true);
                 mods.BindValueChanged(mods =>
@@ -213,14 +209,14 @@ namespace osu.Game.Screens.Select
             protected override void UpdateState(ValueChangedEvent<Visibility> state)
             {
                 base.UpdateState(state);
-                footerButton.OverlayState.Value = practiceEnabled.Value ? Visibility.Visible : state.NewValue;
+                footerButton.OverlayState.Value = practiceMode.Enabled.Value ? Visibility.Visible : state.NewValue;
             }
 
             private void updateDisplay()
             {
-                slider.Alpha = practiceEnabled.Value ? 1 : 0.4f;
-                starRatingDisplay.Alpha = practiceEnabled.Value ? 1 : 0.4f;
-                timeText.Text = practiceEnabled.Value ? $"start at {formatTime(practiceStartTime.Value)}" : $"selected {formatTime(practiceStartTime.Value)}";
+                slider.Alpha = practiceMode.Enabled.Value ? 1 : 0.4f;
+                starRatingDisplay.Alpha = practiceMode.Enabled.Value ? 1 : 0.4f;
+                timeText.Text = practiceMode.Enabled.Value ? $"start at {formatTime(practiceMode.StartTime.Value)}" : $"selected {formatTime(practiceMode.StartTime.Value)}";
                 queueDifficultyUpdate();
             }
 
@@ -243,7 +239,7 @@ namespace osu.Game.Screens.Select
                     return;
                 }
 
-                difficultyCache.GetPracticeDifficultyAsync(footerButton.workingBeatmap.Value, ruleset.Value, mods.Value, practiceStartTime.Value, cancellationSource.Token)
+                difficultyCache.GetPracticeDifficultyAsync(footerButton.workingBeatmap.Value, ruleset.Value, mods.Value, practiceMode.StartTime.Value, cancellationSource.Token)
                                .ContinueWith(task => Schedule(() =>
                                {
                                    if (cancellationSource.IsCancellationRequested)

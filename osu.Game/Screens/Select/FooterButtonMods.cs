@@ -82,6 +82,9 @@ namespace osu.Game.Screens.Select
         [Resolved]
         private IBindable<WorkingBeatmap> beatmap { get; set; } = null!;
 
+        [Resolved(canBeNull: true)]
+        private PracticeModeState? practiceMode { get; set; }
+
         private IBindable<Language> currentLanguage = null!;
 
         public FooterButtonMods(ModSelectOverlay overlay)
@@ -180,6 +183,7 @@ namespace osu.Game.Screens.Select
 
             Ruleset.BindValueChanged(_ => updateDisplay());
             beatmap.BindValueChanged(_ => updateDisplay());
+            practiceMode?.Enabled.BindValueChanged(_ => updateDisplay(), true);
             Mods.BindValueChanged(m =>
             {
                 modSettingChangeTracker?.Dispose();
@@ -213,6 +217,8 @@ namespace osu.Game.Screens.Select
 
         private void updateDisplay()
         {
+            bool hasUnrankedState = practiceMode?.Enabled.Value == true || Mods.Value.Any(m => !m.Ranked);
+
             if (Mods.Value.Count == 0)
             {
                 modDisplayBar.MoveToY(20, duration, easing);
@@ -220,15 +226,26 @@ namespace osu.Game.Screens.Select
                 modDisplay.FadeOut(duration, easing);
                 overflowModCountDisplay.FadeOut(duration, easing);
 
-                unrankedBadge.MoveToY(20, duration, easing);
-                unrankedBadge.FadeOut(duration, easing);
+                if (hasUnrankedState)
+                {
+                    unrankedBadge.MoveToX(0, duration, easing);
+                    unrankedBadge.MoveToY(-5, duration, easing);
+                    unrankedBadge.FadeIn(duration, easing);
 
-                // add delay to let unranked indicator hide first before resizing the button back to its original width.
-                this.Delay(duration).ResizeWidthTo(BUTTON_WIDTH, duration, easing);
+                    this.ResizeWidthTo(BUTTON_WIDTH + 5 + unrankedBadge.DrawWidth, duration, easing);
+                }
+                else
+                {
+                    unrankedBadge.MoveToY(20, duration, easing);
+                    unrankedBadge.FadeOut(duration, easing);
+
+                    // add delay to let unranked indicator hide first before resizing the button back to its original width.
+                    this.Delay(duration).ResizeWidthTo(BUTTON_WIDTH, duration, easing);
+                }
             }
             else
             {
-                if (Mods.Value.Any(m => !m.Ranked))
+                if (hasUnrankedState)
                 {
                     unrankedBadge.MoveToX(0, duration, easing);
                     unrankedBadge.FadeIn(duration, easing);

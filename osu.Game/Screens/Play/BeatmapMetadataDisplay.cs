@@ -4,8 +4,11 @@
 #nullable disable
 
 using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
+using osu.Framework.Extensions;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
@@ -18,8 +21,10 @@ using osu.Game.Graphics.Sprites;
 using osu.Game.Graphics.UserInterface;
 using osu.Game.Localisation;
 using osu.Game.Resources.Localisation.Web;
+using osu.Game.Rulesets;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Screens.Play.HUD;
+using osu.Game.Screens.Select;
 using osuTK;
 using CommonStrings = osu.Game.Localisation.CommonStrings;
 
@@ -87,14 +92,23 @@ namespace osu.Game.Screens.Play
             this.mods.BindTo(mods);
         }
 
-        private IBindable<StarDifficulty> starDifficulty;
-
         private FillFlowContainer versionFlow;
         private StarRatingDisplay starRatingDisplay;
+
+        private BeatmapDifficultyCache difficultyCache;
+        private CancellationTokenSource starDifficultyCancellationSource;
+
+        [Resolved]
+        private IBindable<RulesetInfo> ruleset { get; set; }
+
+        [Resolved(canBeNull: true)]
+        private PracticeModeState practiceMode { get; set; }
 
         [BackgroundDependencyLoader]
         private void load(BeatmapDifficultyCache difficultyCache, OsuColour colours)
         {
+            this.difficultyCache = difficultyCache;
+
             var metadata = beatmap.BeatmapInfo.Metadata;
 
             AutoSizeAxes = Axes.Both;
@@ -238,8 +252,6 @@ namespace osu.Game.Screens.Play
                 }
             };
 
-            starDifficulty = difficultyCache.GetBindableDifficulty(beatmap.BeatmapInfo);
-
             Loading = true;
         }
 
@@ -247,15 +259,43 @@ namespace osu.Game.Screens.Play
         {
             base.LoadComplete();
 
-            starDifficulty.BindValueChanged(d =>
+            mods.BindValueChanged(_ => updateStarRating());
+            ruleset.BindValueChanged(_ => updateStarRating());
+            practiceMode?.Enabled.BindValueChanged(_ => updateStarRating());
+            practiceMode?.StartTime.BindValueChanged(_ => updateStarRating());
+
+            updateStarRating();
+        }
+
+        private void updateStarRating()
+        {
+            starDifficultyCancellationSource?.Cancel();
+            starDifficultyCancellationSource = new CancellationTokenSource();
+
+            var cancellationSource = starDifficultyCancellationSource;
+
+            Task<StarDifficulty?> starDifficultyTask = practiceMode?.Enabled.Value == true
+                ? difficultyCache.GetPracticeDifficultyAsync(beatmap, ruleset.Value, mods.Value, practiceMode.StartTime.Value, cancellationSource.Token)
+                : difficultyCache.GetDifficultyAsync(beatmap.BeatmapInfo, ruleset.Value, mods.Value, cancellationSource.Token);
+
+            starDifficultyTask.ContinueWith(task => Schedule(() =>
             {
-                starRatingDisplay.Current.Value = d.NewValue;
+                if (cancellationSource.IsCancellationRequested)
+                    return;
+
+                starRatingDisplay.Current.Value = task.GetResultSafely() ?? new StarDifficulty(-1, 0);
 
                 versionFlow.AutoSizeDuration = 300;
                 versionFlow.AutoSizeEasing = Easing.OutQuint;
 
                 starRatingDisplay.FadeIn(300, Easing.InQuint);
-            }, true);
+            }), TaskContinuationOptions.OnlyOnRanToCompletion);
+        }
+
+        protected override void Dispose(bool isDisposing)
+        {
+            starDifficultyCancellationSource?.Cancel();
+            base.Dispose(isDisposing);
         }
 
         private partial class MetadataLineLabel : OsuSpriteText

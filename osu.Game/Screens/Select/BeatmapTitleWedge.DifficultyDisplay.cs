@@ -8,6 +8,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
+using osu.Framework.Extensions;
 using osu.Framework.Extensions.Color4Extensions;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
@@ -43,6 +44,9 @@ namespace osu.Game.Screens.Select
             [Resolved]
             private IBindable<IReadOnlyList<Mod>> mods { get; set; } = null!;
 
+            [Resolved(canBeNull: true)]
+            private PracticeModeState? practiceMode { get; set; }
+
             private ModSettingChangeTracker? settingChangeTracker;
 
             [Resolved]
@@ -60,6 +64,7 @@ namespace osu.Game.Screens.Select
             private DifficultyStatisticsDisplay difficultyStatisticsDisplay = null!;
 
             private CancellationTokenSource? cancellationSource;
+            private readonly Bindable<StarDifficulty> practiceStarDifficulty = new Bindable<StarDifficulty>(new StarDifficulty(-1, 0));
 
             public DifficultyDisplay()
             {
@@ -213,17 +218,24 @@ namespace osu.Game.Screens.Select
                 // and it's what you'd want to do anyway for performance reasons.
                 beatmap.BindValueChanged(_ => Scheduler.AddOnce(updateDisplay));
                 ruleset.BindValueChanged(_ => Scheduler.AddOnce(updateDisplay));
+                practiceMode?.Enabled.BindValueChanged(_ => Scheduler.AddOnce(updateDisplay), true);
+                practiceMode?.StartTime.BindValueChanged(_ => Scheduler.AddOnce(updateDisplay), true);
 
                 mods.BindValueChanged(m =>
                 {
                     settingChangeTracker?.Dispose();
 
+                    Scheduler.AddOnce(updateDisplay);
                     updateDifficultyStatistics();
 
                     if (m.NewValue.Any())
                     {
                         settingChangeTracker = new ModSettingChangeTracker(m.NewValue);
-                        settingChangeTracker.SettingChanged += _ => updateDifficultyStatistics();
+                        settingChangeTracker.SettingChanged += _ =>
+                        {
+                            Scheduler.AddOnce(updateDisplay);
+                            updateDifficultyStatistics();
+                        };
                     }
                 }, true);
 
@@ -251,10 +263,37 @@ namespace osu.Game.Screens.Select
                     mapperText.Text = beatmap.Value.Metadata.Author.Username;
                 }
 
-                starRatingDisplay.Current = (Bindable<StarDifficulty>)difficultyCache.GetBindableDifficulty(beatmap.Value.BeatmapInfo, cancellationSource.Token, SongSelect.DIFFICULTY_CALCULATION_DEBOUNCE);
+                updateStarRating(cancellationSource.Token);
 
                 updateCountStatistics(cancellationSource.Token);
                 updateDifficultyStatistics();
+            }
+
+            private void updateStarRating(CancellationToken cancellationToken)
+            {
+                if (beatmap.IsDefault || ruleset.Value == null)
+                {
+                    practiceStarDifficulty.Value = new StarDifficulty(-1, 0);
+                    starRatingDisplay.Current = practiceStarDifficulty;
+                    return;
+                }
+
+                if (practiceMode?.Enabled.Value != true)
+                {
+                    starRatingDisplay.Current = (Bindable<StarDifficulty>)difficultyCache.GetBindableDifficulty(beatmap.Value.BeatmapInfo, cancellationToken, SongSelect.DIFFICULTY_CALCULATION_DEBOUNCE);
+                    return;
+                }
+
+                starRatingDisplay.Current = practiceStarDifficulty;
+
+                difficultyCache.GetPracticeDifficultyAsync(beatmap.Value, ruleset.Value, mods.Value, practiceMode.StartTime.Value, cancellationToken)
+                               .ContinueWith(task => Schedule(() =>
+                               {
+                                   if (cancellationToken.IsCancellationRequested)
+                                       return;
+
+                                   practiceStarDifficulty.Value = task.GetResultSafely() ?? new StarDifficulty(-1, 0);
+                               }), TaskContinuationOptions.OnlyOnRanToCompletion);
             }
 
             private void updateCountStatistics(CancellationToken cancellationToken)

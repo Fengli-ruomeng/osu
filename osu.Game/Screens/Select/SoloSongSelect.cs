@@ -33,13 +33,9 @@ namespace osu.Game.Screens.Select
 
         private PlayerLoader? playerLoader;
         private IReadOnlyList<Mod>? modsAtGameplayStart;
-        private readonly BindableBool practiceEnabled = new BindableBool();
-        private readonly BindableDouble practiceStartTime = new BindableDouble
-        {
-            MinValue = 0,
-            MaxValue = 1000,
-            Precision = 1000,
-        };
+
+        [Cached]
+        private readonly PracticeModeState practiceMode = new PracticeModeState();
 
         [Resolved]
         private BeatmapSetOverlay? beatmapOverlay { get; set; }
@@ -131,7 +127,7 @@ namespace osu.Game.Screens.Select
                 Mods.Value = mods;
             }
 
-            if (practiceEnabled.Value && Mods.Value.OfType<ICreateReplayData>().Any())
+            if (practiceMode.Enabled.Value && Mods.Value.OfType<ICreateReplayData>().Any())
             {
                 Mods.Value = modsAtGameplayStart;
 
@@ -159,10 +155,10 @@ namespace osu.Game.Screens.Select
                 }
                 else
                 {
-                    player = new SoloPlayer(practiceEnabled.Value
+                    player = new SoloPlayer(practiceMode.Enabled.Value
                         ? new PlayerConfiguration
                         {
-                            PracticeTargetTime = practiceStartTime.Value,
+                            PracticeTargetTime = practiceMode.StartTime.Value,
                         }
                         : null);
                 }
@@ -174,7 +170,7 @@ namespace osu.Game.Screens.Select
         public override IReadOnlyList<ScreenFooterButton> CreateFooterButtons()
         {
             var buttons = base.CreateFooterButtons().ToList();
-            buttons.Insert(1, new FooterButtonPractice(practiceEnabled, practiceStartTime));
+            buttons.Insert(1, new FooterButtonPractice(practiceMode));
             return buttons;
         }
 
