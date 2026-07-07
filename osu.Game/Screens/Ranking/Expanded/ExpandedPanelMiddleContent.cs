@@ -64,11 +64,11 @@ namespace osu.Game.Screens.Ranking.Expanded
             var metadata = beatmap.BeatmapSet?.Metadata ?? beatmap.Metadata;
             string creator = metadata.Author.Username;
 
-            StarDifficulty starDifficulty = new StarDifficulty(beatmap.StarRating, 0);
+            StarDifficulty starDifficulty = score.StarDifficultyOverride ?? new StarDifficulty(beatmap.StarRating, 0);
 
             // In some cases, the beatmap ferried through ScoreInfo actually represents an online beatmap.
             // If it isn't, we may be able to compute a more accurate difficulty from the ruleset and mods.
-            if (realmAccess.Run(r => r.Find<BeatmapInfo>(score.BeatmapInfo!.ID)) != null)
+            if (score.StarDifficultyOverride == null && realmAccess.Run(r => r.Find<BeatmapInfo>(score.BeatmapInfo!.ID)) != null)
                 starDifficulty = beatmapDifficultyCache.GetDifficultyAsync(score.BeatmapInfo!, score.Ruleset, score.Mods).GetResultSafely() ?? starDifficulty;
 
             var topStatistics = new List<StatisticDisplay>

@@ -119,6 +119,12 @@ namespace osu.Game.Scoring
 
         public double? PP { get; set; }
 
+        [Ignored]
+        public double? PracticeStartTime { get; set; }
+
+        [Ignored]
+        public StarDifficulty? StarDifficultyOverride { get; set; }
+
         /// <summary>
         /// Whether the performance points in this score is awarded to the player. This is used for online display purposes (see <see cref="SoloScoreInfo.Ranked"/>).
         /// </summary>

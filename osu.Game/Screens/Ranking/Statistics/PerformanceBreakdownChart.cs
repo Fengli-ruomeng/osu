@@ -162,9 +162,20 @@ namespace osu.Game.Screens.Ranking.Statistics
             if (performanceCalculator == null)
                 return null;
 
-            var starsTask = difficultyCache.GetDifficultyAsync(score.BeatmapInfo!, score.Ruleset, score.Mods, token).ConfigureAwait(false);
-            if (await starsTask is not StarDifficulty stars)
-                return null;
+            StarDifficulty stars;
+
+            if (score.StarDifficultyOverride is StarDifficulty starDifficulty)
+            {
+                stars = starDifficulty;
+            }
+            else
+            {
+                var starsTask = difficultyCache.GetDifficultyAsync(score.BeatmapInfo!, score.Ruleset, score.Mods, token).ConfigureAwait(false);
+                if (await starsTask is not StarDifficulty calculatedStars)
+                    return null;
+
+                stars = calculatedStars;
+            }
 
             if (stars.DifficultyAttributes == null || stars.PerformanceAttributes == null)
                 return null;

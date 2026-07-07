@@ -25,7 +25,7 @@ namespace osu.Game.Screens.Play
         public SoloPlayer([CanBeNull] PlayerConfiguration configuration = null)
             : base(configuration)
         {
-            Configuration.ShowLeaderboard = true;
+            Configuration.ShowLeaderboard = !Configuration.PracticeMode;
         }
 
         [BackgroundDependencyLoader]
@@ -36,6 +36,9 @@ namespace osu.Game.Screens.Play
 
         protected override APIRequest<APIScoreToken> CreateTokenRequest()
         {
+            if (Configuration.PracticeMode)
+                return null;
+
             int beatmapId = Beatmap.Value.BeatmapInfo.OnlineID;
             int rulesetId = Ruleset.Value.OnlineID;
 

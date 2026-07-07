@@ -6,6 +6,18 @@ namespace osu.Game.Screens.Play
     public class PlayerConfiguration
     {
         /// <summary>
+        /// The target time to start practice from, if practice mode is active.
+        /// </summary>
+        public double? PracticeTargetTime { get; set; }
+
+        /// <summary>
+        /// The amount of time before <see cref="PracticeTargetTime"/> to begin playback from.
+        /// </summary>
+        public double PracticeLeadIn { get; set; } = 2000;
+
+        public bool PracticeMode => PracticeTargetTime != null;
+
+        /// <summary>
         /// Whether pausing should be allowed. If not allowed, attempting to pause will quit.
         /// </summary>
         public bool AllowPause { get; set; } = true;

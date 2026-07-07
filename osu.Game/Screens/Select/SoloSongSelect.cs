@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.Linq;
 using osu.Framework.Allocation;
 using osu.Framework.Audio;
+using osu.Framework.Bindables;
 using osu.Framework.Audio.Sample;
 using osu.Framework.Extensions.LocalisationExtensions;
 using osu.Framework.Graphics.Sprites;
@@ -17,6 +18,7 @@ using osu.Game.Online.API;
 using osu.Game.Overlays;
 using osu.Game.Overlays.Notifications;
 using osu.Game.Rulesets.Mods;
+using osu.Game.Screens.Footer;
 using osu.Game.Screens.Edit;
 using osu.Game.Screens.Play;
 using osu.Game.Users;
@@ -31,6 +33,13 @@ namespace osu.Game.Screens.Select
 
         private PlayerLoader? playerLoader;
         private IReadOnlyList<Mod>? modsAtGameplayStart;
+        private readonly BindableBool practiceEnabled = new BindableBool();
+        private readonly BindableDouble practiceStartTime = new BindableDouble
+        {
+            MinValue = 0,
+            MaxValue = 1000,
+            Precision = 1000,
+        };
 
         [Resolved]
         private BeatmapSetOverlay? beatmapOverlay { get; set; }
@@ -122,6 +131,18 @@ namespace osu.Game.Screens.Select
                 Mods.Value = mods;
             }
 
+            if (practiceEnabled.Value && Mods.Value.OfType<ICreateReplayData>().Any())
+            {
+                Mods.Value = modsAtGameplayStart;
+
+                notifications?.Post(new SimpleNotification
+                {
+                    Text = "Practice start is not available with replay-generating mods."
+                });
+
+                return;
+            }
+
             sampleConfirmSelection?.Play();
 
             this.Push(playerLoader = new PlayerLoader(createPlayer));
@@ -138,11 +159,23 @@ namespace osu.Game.Screens.Select
                 }
                 else
                 {
-                    player = new SoloPlayer();
+                    player = new SoloPlayer(practiceEnabled.Value
+                        ? new PlayerConfiguration
+                        {
+                            PracticeTargetTime = practiceStartTime.Value,
+                        }
+                        : null);
                 }
 
                 return player;
             }
+        }
+
+        public override IReadOnlyList<ScreenFooterButton> CreateFooterButtons()
+        {
+            var buttons = base.CreateFooterButtons().ToList();
+            buttons.Insert(1, new FooterButtonPractice(practiceEnabled, practiceStartTime));
+            return buttons;
         }
 
         public void Edit(BeatmapInfo beatmap)

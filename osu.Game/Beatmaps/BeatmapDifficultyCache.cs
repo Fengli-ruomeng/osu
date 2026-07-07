@@ -203,6 +203,40 @@ namespace osu.Game.Beatmaps
                 updateScheduler);
         }
 
+        public Task<StarDifficulty?> GetPracticeDifficultyAsync(IWorkingBeatmap beatmap, RulesetInfo rulesetInfo, IEnumerable<Mod>? mods, double startTime, CancellationToken cancellationToken = default)
+        {
+            var orderedMods = mods?.OrderBy(m => m.Acronym).Select(m => m.DeepClone()).ToArray() ?? Array.Empty<Mod>();
+
+            return Task.Factory.StartNew<StarDifficulty?>(() =>
+            {
+                try
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+
+                    var ruleset = rulesetInfo.CreateInstance();
+                    Debug.Assert(ruleset != null);
+                    if (ruleset == null)
+                        return null;
+
+                    return PracticeBeatmapDifficulty.Calculate(beatmap, ruleset, orderedMods, startTime, cancellationToken);
+                }
+                catch (OperationCanceledException)
+                {
+                    return null;
+                }
+                catch (BeatmapInvalidForRulesetException invalidForRuleset)
+                {
+                    Logger.Error(invalidForRuleset, $"Failed to convert {beatmap.BeatmapInfo.OnlineID} to {rulesetInfo.Name} for practice difficulty calculation.");
+                    return null;
+                }
+                catch (Exception unknownException)
+                {
+                    Logger.Error(unknownException, "Failed to calculate practice beatmap difficulty");
+                    return null;
+                }
+            }, cancellationToken, TaskCreationOptions.HideScheduler | TaskCreationOptions.RunContinuationsAsynchronously, updateScheduler);
+        }
+
         /// <summary>
         /// Updates all tracked <see cref="BindableStarDifficulty"/> using the current ruleset and mods.
         /// </summary>

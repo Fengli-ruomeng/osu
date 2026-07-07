@@ -190,8 +190,12 @@ namespace osu.Game.Screens.Play
             score.ScoreInfo.Date = DateTimeOffset.Now;
 
             await submitScore(score).ConfigureAwait(false);
-            spectatorClient.EndPlaying(GameplayState);
-            userStatisticsWatcher?.RegisterForStatisticsUpdateAfter(score.ScoreInfo);
+
+            if (!Configuration.PracticeMode)
+            {
+                spectatorClient.EndPlaying(GameplayState);
+                userStatisticsWatcher?.RegisterForStatisticsUpdateAfter(score.ScoreInfo);
+            }
         }
 
         [Resolved]
@@ -210,7 +214,8 @@ namespace osu.Game.Screens.Play
                     realmBeatmap.LastPlayed = DateTimeOffset.Now;
             });
 
-            spectatorClient.BeginPlaying(token, GameplayState, Score);
+            if (!Configuration.PracticeMode)
+                spectatorClient.BeginPlaying(token, GameplayState, Score);
         }
 
         public override bool Pause()
@@ -249,7 +254,9 @@ namespace osu.Game.Screens.Play
                 Task.Run(async () =>
                 {
                     await submitScore(scoreCopy).ConfigureAwait(false);
-                    spectatorClient.EndPlaying(GameplayState);
+
+                    if (!Configuration.PracticeMode)
+                        spectatorClient.EndPlaying(GameplayState);
                 }).FireAndForget();
             }
         }

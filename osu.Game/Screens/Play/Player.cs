@@ -179,6 +179,8 @@ namespace osu.Game.Screens.Play
 
         public readonly PlayerConfiguration Configuration;
 
+        private double? practiceTargetTime;
+
         /// <summary>
         /// The score for the current play session.
         /// Available only after the player is loaded.
@@ -220,6 +222,9 @@ namespace osu.Game.Screens.Play
         /// </summary>
         protected virtual void PrepareReplay()
         {
+            if (Configuration.PracticeMode)
+                return;
+
             DrawableRuleset.SetRecordTarget(Score);
         }
 
@@ -241,6 +246,14 @@ namespace osu.Game.Screens.Play
 
             if (playableBeatmap == null)
                 return;
+
+            applyPracticeStart(playableBeatmap);
+
+            if (playableBeatmap.HitObjects.Count == 0)
+            {
+                Logger.Log("Practice start removed all hit objects!", level: LogLevel.Important);
+                return;
+            }
 
             if (!ModUtils.CheckModsBelongToRuleset(ruleset, gameplayMods))
             {
@@ -320,7 +333,7 @@ namespace osu.Game.Screens.Play
                 },
                 FailOverlay = new FailOverlay
                 {
-                    SaveReplay = Configuration.AllowUserInteraction ? async () => await prepareAndImportScoreAsync(true).ConfigureAwait(false) : null,
+                    SaveReplay = Configuration.AllowUserInteraction && !Configuration.PracticeMode ? async () => await prepareAndImportScoreAsync(true).ConfigureAwait(false) : null,
                     OnRetry = Configuration.AllowUserInteraction ? () => Restart() : null,
                     OnQuit = () => PerformExitWithConfirmation(),
                 },
@@ -624,6 +637,14 @@ namespace osu.Game.Screens.Play
             }
 
             return playable;
+        }
+
+        private void applyPracticeStart(IBeatmap playableBeatmap)
+        {
+            if (Configuration.PracticeTargetTime == null)
+                return;
+
+            practiceTargetTime = PracticeBeatmapDifficulty.ApplyStart(playableBeatmap, Configuration.PracticeTargetTime.Value);
         }
 
         /// <summary>
@@ -1171,7 +1192,13 @@ namespace osu.Game.Screens.Play
             if (GameplayClockContainer.IsRunning)
                 Logger.Error(new InvalidOperationException($"{nameof(StartGameplay)} should not be called when the gameplay clock is already running"), "Clock failure");
 
-            GameplayClockContainer.Reset(startClock: true);
+            if (practiceTargetTime != null)
+            {
+                SetGameplayStartTime(Math.Max(0, practiceTargetTime.Value - Configuration.PracticeLeadIn));
+                GameplayClockContainer.Start();
+            }
+            else
+                GameplayClockContainer.Reset(startClock: true);
 
             if (Configuration.AutomaticallySkipIntro)
                 SkipIntroOverlay.SkipWhenReady();
@@ -1243,6 +1270,9 @@ namespace osu.Game.Screens.Play
         /// <returns>The imported score.</returns>
         protected virtual Task ImportScore(Score score)
         {
+            if (Configuration.PracticeMode)
+                return Task.CompletedTask;
+
             // Replays are already populated and present in the game's database, so should not be re-imported.
             if (DrawableRuleset.ReplayScore != null)
                 return Task.CompletedTask;
@@ -1280,7 +1310,21 @@ namespace osu.Game.Screens.Play
         /// </summary>
         /// <param name="score">The <see cref="Scoring.Score"/> to prepare.</param>
         /// <returns>A task that prepares the provided score. On completion, the score is assumed to be ready for display.</returns>
-        protected virtual Task PrepareScoreForResultsAsync(Score score) => Task.CompletedTask;
+        protected virtual Task PrepareScoreForResultsAsync(Score score)
+        {
+            if (!Configuration.PracticeMode || practiceTargetTime == null)
+                return Task.CompletedTask;
+
+            score.ScoreInfo.PracticeStartTime = practiceTargetTime;
+
+            var starDifficulty = PracticeBeatmapDifficulty.Calculate(GameplayState.Beatmap, GameplayState.Ruleset, GameplayState.Mods);
+            score.ScoreInfo.StarDifficultyOverride = starDifficulty;
+
+            if (starDifficulty.DifficultyAttributes != null)
+                score.ScoreInfo.PP = GameplayState.Ruleset.CreatePerformanceCalculator()?.Calculate(score.ScoreInfo, starDifficulty.DifficultyAttributes).Total;
+
+            return Task.CompletedTask;
+        }
 
         /// <summary>
         /// Creates the <see cref="ResultsScreen"/> for a <see cref="ScoreInfo"/>.
