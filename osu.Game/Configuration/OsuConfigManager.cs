@@ -124,6 +124,7 @@ namespace osu.Game.Configuration
 
             // Graphics
             SetDefault(OsuSetting.ShowFpsDisplay, false);
+            SetDefault(OsuSetting.TrueUnlimitedFrameLimiter, false);
 
             SetDefault(OsuSetting.ShowStoryboard, true);
             SetDefault(OsuSetting.BeatmapSkins, true);
@@ -380,6 +381,7 @@ namespace osu.Game.Configuration
         RandomSelectAlgorithm,
         ModSelectHotkeyStyle,
         ShowFpsDisplay,
+        TrueUnlimitedFrameLimiter,
         ChatDisplayHeight,
         BeatmapListingCardSize,
         ToolbarClockDisplayMode,

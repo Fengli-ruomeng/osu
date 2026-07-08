@@ -167,6 +167,8 @@ namespace osu.Game
         [Resolved]
         private FrameworkConfigManager frameworkConfig { get; set; }
 
+        private GameHost host;
+
         private DifficultyRecommender difficultyRecommender;
 
         [Cached]
@@ -363,6 +365,8 @@ namespace osu.Game
         {
             base.SetHost(host);
 
+            this.host = host;
+
             if (host.Window != null)
             {
                 host.Window.CursorState |= CursorState.Hidden;
@@ -419,6 +423,12 @@ namespace osu.Game
             configRuleset = LocalConfig.GetBindable<string>(OsuSetting.Ruleset);
             uiScale = LocalConfig.GetBindable<float>(OsuSetting.UIScale);
 
+            var frameSync = frameworkConfig.GetBindable<FrameSync>(FrameworkSetting.FrameSync);
+            var trueUnlimitedFrameLimiter = LocalConfig.GetBindable<bool>(OsuSetting.TrueUnlimitedFrameLimiter);
+
+            frameSync.BindValueChanged(_ => updateTrueUnlimitedFrameLimiter(frameSync, trueUnlimitedFrameLimiter), true);
+            trueUnlimitedFrameLimiter.BindValueChanged(_ => updateTrueUnlimitedFrameLimiter(frameSync, trueUnlimitedFrameLimiter), true);
+
             var preferredRuleset = RulesetStore.GetRuleset(configRuleset.Value);
 
             try
@@ -461,6 +471,24 @@ namespace osu.Game
 
             applySafeAreaConsiderations = LocalConfig.GetBindable<bool>(OsuSetting.SafeAreaConsiderations);
             applySafeAreaConsiderations.BindValueChanged(apply => SafeAreaContainer.SafeAreaOverrideEdges = apply.NewValue ? SafeAreaOverrideEdges : Edges.All, true);
+        }
+
+        private void updateTrueUnlimitedFrameLimiter(IBindable<FrameSync> frameSync, IBindable<bool> trueUnlimitedFrameLimiter)
+        {
+            bool enabled = trueUnlimitedFrameLimiter.Value && frameSync.Value == FrameSync.Unlimited;
+
+            host.AllowBenchmarkUnlimitedFrames = enabled;
+
+            if (enabled)
+            {
+                host.MaximumDrawHz = int.MaxValue;
+                host.MaximumUpdateHz = int.MaxValue;
+            }
+            else if (frameSync.Value == FrameSync.Unlimited)
+            {
+                host.MaximumDrawHz = 1000;
+                host.MaximumUpdateHz = 1000;
+            }
         }
 
         private ExternalLinkOpener externalLinkOpener;

@@ -19,6 +19,7 @@ using osu.Framework.Platform;
 using osu.Framework.Platform.Windows;
 using osu.Framework.Screens;
 using osu.Framework.Utils;
+using osu.Game.Configuration;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.Sprites;
@@ -64,6 +65,9 @@ namespace osu.Game.Screens.Utility
 
         [Resolved]
         private FrameworkConfigManager config { get; set; } = null!;
+
+        [Resolved]
+        private OsuConfigManager osuConfig { get; set; } = null!;
 
         public readonly Bindable<LatencyVisualMode> VisualMode = new Bindable<LatencyVisualMode>();
 
@@ -220,9 +224,9 @@ namespace osu.Game.Screens.Utility
 
         public override bool OnExiting(ScreenExitEvent e)
         {
-            host.AllowBenchmarkUnlimitedFrames = false;
             config.SetValue(FrameworkSetting.FrameSync, previousFrameSyncMode);
             host.UpdateThread.ActiveHz = previousActiveHz;
+            host.AllowBenchmarkUnlimitedFrames = osuConfig.Get<bool>(OsuSetting.TrueUnlimitedFrameLimiter) && previousFrameSyncMode == FrameSync.Unlimited;
             return base.OnExiting(e);
         }
 

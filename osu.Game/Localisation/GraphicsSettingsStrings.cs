@@ -40,6 +40,16 @@ namespace osu.Game.Localisation
         public static LocalisableString ShowFPS => new TranslatableString(getKey(@"show_fps"), @"Show FPS");
 
         /// <summary>
+        /// "True unlimited"
+        /// </summary>
+        public static LocalisableString TrueUnlimitedFrameLimiter => new TranslatableString(getKey(@"true_unlimited_frame_limiter"), @"True unlimited");
+
+        /// <summary>
+        /// "Allow the basically unlimited frame limiter to exceed the default 1000 FPS cap."
+        /// </summary>
+        public static LocalisableString TrueUnlimitedFrameLimiterTooltip => new TranslatableString(getKey(@"true_unlimited_frame_limiter_tooltip"), @"Allow the basically unlimited frame limiter to exceed the default 1000 FPS cap.");
+
+        /// <summary>
         /// "Layout"
         /// </summary>
         public static LocalisableString LayoutHeader => new TranslatableString(getKey(@"layout_header"), @"Layout");

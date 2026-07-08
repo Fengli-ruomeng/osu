@@ -4,6 +4,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using osu.Framework.Allocation;
+using osu.Framework.Bindables;
 using osu.Framework.Configuration;
 using osu.Framework.Extensions;
 using osu.Framework.Graphics;
@@ -21,11 +22,13 @@ namespace osu.Game.Overlays.Settings.Sections.Graphics
         protected override LocalisableString Header => GraphicsSettingsStrings.RendererHeader;
 
         private bool automaticRendererInUse;
+        private readonly BindableBool trueUnlimitedCanBeShown = new BindableBool();
 
         [BackgroundDependencyLoader]
         private void load(FrameworkConfigManager config, OsuConfigManager osuConfig, IDialogOverlay? dialogOverlay, OsuGame? game, GameHost host)
         {
             var renderer = config.GetBindable<RendererType>(FrameworkSetting.Renderer);
+            var frameSync = config.GetBindable<FrameSync>(FrameworkSetting.FrameSync);
             automaticRendererInUse = renderer.Value == RendererType.Automatic;
 
             IEnumerable<RendererType> availableRenderers = host.GetPreferredRenderersForCurrentPlatform().Order();
@@ -52,10 +55,20 @@ namespace osu.Game.Overlays.Settings.Sections.Graphics
                 new SettingsItemV2(new FormEnumDropdown<FrameSync>
                 {
                     Caption = GraphicsSettingsStrings.FrameLimiter,
-                    Current = config.GetBindable<FrameSync>(FrameworkSetting.FrameSync),
+                    Current = frameSync,
                 })
                 {
                     Keywords = new[] { @"fps", @"framerate" },
+                },
+                new SettingsItemV2(new FormCheckBox
+                {
+                    Caption = GraphicsSettingsStrings.TrueUnlimitedFrameLimiter,
+                    HintText = GraphicsSettingsStrings.TrueUnlimitedFrameLimiterTooltip,
+                    Current = osuConfig.GetBindable<bool>(OsuSetting.TrueUnlimitedFrameLimiter),
+                })
+                {
+                    Keywords = new[] { @"fps", @"framerate", @"unlimited" },
+                    CanBeShown = { BindTarget = trueUnlimitedCanBeShown },
                 },
                 new SettingsItemV2(new FormEnumDropdown<ExecutionMode>
                 {
@@ -93,6 +106,8 @@ namespace osu.Game.Overlays.Settings.Sections.Graphics
                     }));
                 }
             });
+
+            frameSync.BindValueChanged(_ => trueUnlimitedCanBeShown.Value = frameSync.Value == FrameSync.Unlimited, true);
         }
 
         private partial class RendererDropdown : FormEnumDropdown<RendererType>
