@@ -35,3 +35,19 @@ Any suggestions for my special version are welcome — or just have fun playing 
 You can enable Practice Mode.
 
 This mode allows you to start playing from any point in a song.
+
+### 2. True unlimited FPS
+
+Once this mode is enabled, the game's basic unlimited mode will become a true unlimited mode.
+
+The FPS is allowed to exceed the maximum limit of 1000 FPS, and the latency will be less than 1ms.
+
+Enabling this mode may put some pressure on the CPU.
+
+### 3. Dancer Trail
+
+It can enable more gorgeous trajectory effects.
+
+This effect is actually based on the implementation logic of the Osu Dancer project.
+
+It also allows for some customization.
