@@ -27,6 +27,7 @@ namespace osu.Game.Rulesets.Osu.UI.Cursor
         private bool cursorExpand;
 
         private SkinnableDrawable cursorSprite;
+        private Circle fluidCursor;
         private Container cursorScaleContainer = null!;
 
         private SkinnableCursor skinnableCursor => (SkinnableCursor)cursorSprite.Drawable;
@@ -52,6 +53,9 @@ namespace osu.Game.Rulesets.Osu.UI.Cursor
 
         private Bindable<float> userCursorScale = null!;
         private Bindable<bool> autoCursorScale = null!;
+        private readonly Bindable<bool> useFluidCursorTrail = new Bindable<bool>();
+        private readonly Bindable<float> fluidCursorTrailThickness = new BindableFloat(1);
+        private readonly Bindable<Colour4> fluidCursorTrailColour = new BindableColour4(Colour4.White);
 
         [Resolved(canBeNull: true)]
         private GameplayState state { get; set; }
@@ -80,6 +84,15 @@ namespace osu.Game.Rulesets.Osu.UI.Cursor
             ModScaleAdjust.ValueChanged += _ => cursorScale.Value = CalculateCursorScale();
 
             cursorScale.BindValueChanged(e => cursorScaleContainer.Scale = new Vector2(e.NewValue), true);
+
+            config.BindWith(OsuSetting.FluidCursorTrail, useFluidCursorTrail);
+            useFluidCursorTrail.BindValueChanged(_ => updateFluidCursorVisibility(), true);
+
+            config.BindWith(OsuSetting.FluidCursorTrailThickness, fluidCursorTrailThickness);
+            fluidCursorTrailThickness.BindValueChanged(_ => updateFluidCursorScale(), true);
+
+            config.BindWith(OsuSetting.FluidCursorTrailColour, fluidCursorTrailColour);
+            fluidCursorTrailColour.BindValueChanged(e => updateFluidCursorColour(e.NewValue), true);
         }
 
         protected override void LoadComplete()
@@ -93,12 +106,36 @@ namespace osu.Game.Rulesets.Osu.UI.Cursor
             RelativeSizeAxes = Axes.Both,
             Origin = Anchor.Centre,
             Anchor = Anchor.Centre,
-            Child = cursorSprite = new SkinnableDrawable(new OsuSkinComponentLookup(OsuSkinComponents.Cursor), _ => new DefaultCursor(), confineMode: ConfineMode.NoScaling)
+            Children = new Drawable[]
             {
-                Origin = Anchor.Centre,
-                Anchor = Anchor.Centre,
+                cursorSprite = new SkinnableDrawable(new OsuSkinComponentLookup(OsuSkinComponents.Cursor), _ => new DefaultCursor(), confineMode: ConfineMode.NoScaling)
+                {
+                    Origin = Anchor.Centre,
+                    Anchor = Anchor.Centre,
+                },
+                fluidCursor = new Circle
+                {
+                    Origin = Anchor.Centre,
+                    Anchor = Anchor.Centre,
+                    Size = new Vector2(FluidCursorTrail.CURSOR_DIAMETER),
+                    Colour = Color4.White,
+                    Blending = BlendingParameters.Additive,
+                    Alpha = 0,
+                    EdgeEffect = new EdgeEffectParameters
+                    {
+                        Type = EdgeEffectType.Glow,
+                        Radius = 4,
+                        Colour = Color4.White.Opacity(0.3f),
+                    },
+                },
             },
         };
+
+        protected override void Update()
+        {
+            base.Update();
+            updateFluidCursorScale();
+        }
 
         protected virtual float CalculateCursorScale()
         {
@@ -126,6 +163,28 @@ namespace osu.Game.Rulesets.Osu.UI.Cursor
         }
 
         public void Contract() => skinnableCursor.Contract();
+
+        private void updateFluidCursorVisibility()
+        {
+            cursorSprite.FadeTo(useFluidCursorTrail.Value ? 0 : 1, 200);
+            fluidCursor.FadeTo(useFluidCursorTrail.Value ? 1 : 0, 200);
+        }
+
+        private void updateFluidCursorScale()
+        {
+            fluidCursor.Scale = CurrentExpandedScale * fluidCursorTrailThickness.Value;
+        }
+
+        private void updateFluidCursorColour(Colour4 colour)
+        {
+            fluidCursor.Colour = colour;
+            fluidCursor.EdgeEffect = new EdgeEffectParameters
+            {
+                Type = EdgeEffectType.Glow,
+                Radius = 4,
+                Colour = colour.Opacity(0.3f),
+            };
+        }
 
         /// <summary>
         /// Get the scale applicable to the ActiveCursor based on a beatmap's circle size.

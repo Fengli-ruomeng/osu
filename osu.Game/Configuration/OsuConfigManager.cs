@@ -8,6 +8,7 @@ using osu.Framework.Configuration;
 using osu.Framework.Configuration.Tracking;
 using osu.Framework.Extensions;
 using osu.Framework.Extensions.LocalisationExtensions;
+using osu.Framework.Graphics;
 using osu.Framework.Localisation;
 using osu.Framework.Platform;
 using osu.Game.Beatmaps.Drawables.Cards;
@@ -132,6 +133,10 @@ namespace osu.Game.Configuration
             SetDefault(OsuSetting.BeatmapHitsounds, true);
 
             SetDefault(OsuSetting.CursorRotation, true);
+            SetDefault(OsuSetting.FluidCursorTrail, false);
+            SetDefault(OsuSetting.FluidCursorTrailThickness, 1.0f, 0.5f, 8f, 0.05f);
+            SetDefault(OsuSetting.FluidCursorTrailLength, 1.0f, 0.25f, 4f, 0.05f);
+            SetDefault(OsuSetting.FluidCursorTrailColour, Colour4.White);
 
             SetDefault(OsuSetting.MenuParallax, true);
 
@@ -365,6 +370,10 @@ namespace osu.Game.Configuration
         MenuVoice,
         MenuTips,
         CursorRotation,
+        FluidCursorTrail,
+        FluidCursorTrailThickness,
+        FluidCursorTrailLength,
+        FluidCursorTrailColour,
         MenuParallax,
         Prefer24HourTime,
         BeatmapDetailTab,

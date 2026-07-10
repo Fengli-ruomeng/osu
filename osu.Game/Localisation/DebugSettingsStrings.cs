@@ -39,6 +39,26 @@ namespace osu.Game.Localisation
         /// </summary>
         public static LocalisableString RunLatencyCertifier => new TranslatableString(getKey(@"run_latency_certifier"), @"Run latency certifier");
 
+        /// <summary>
+        /// "FluidCursorTrail"
+        /// </summary>
+        public static LocalisableString FluidCursorTrail => new TranslatableString(getKey(@"fluid_cursor_trail"), @"FluidCursorTrail");
+
+        /// <summary>
+        /// "FluidCursorTrail thickness"
+        /// </summary>
+        public static LocalisableString FluidCursorTrailThickness => new TranslatableString(getKey(@"fluid_cursor_trail_thickness"), @"FluidCursorTrail thickness");
+
+        /// <summary>
+        /// "FluidCursorTrail length"
+        /// </summary>
+        public static LocalisableString FluidCursorTrailLength => new TranslatableString(getKey(@"fluid_cursor_trail_length"), @"FluidCursorTrail length");
+
+        /// <summary>
+        /// "FluidCursorTrail colour"
+        /// </summary>
+        public static LocalisableString FluidCursorTrailColour => new TranslatableString(getKey(@"fluid_cursor_trail_colour"), @"FluidCursorTrail colour");
+
         private static string getKey(string key) => $"{prefix}:{key}";
     }
 }

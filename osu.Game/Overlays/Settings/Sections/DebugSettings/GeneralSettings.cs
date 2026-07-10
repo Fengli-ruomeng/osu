@@ -3,8 +3,11 @@
 
 using osu.Framework.Allocation;
 using osu.Framework.Configuration;
+using osu.Framework.Graphics;
 using osu.Framework.Localisation;
+using osu.Game.Configuration;
 using osu.Game.Graphics.UserInterfaceV2;
+using osu.Game.Localisation;
 
 namespace osu.Game.Overlays.Settings.Sections.DebugSettings
 {
@@ -13,7 +16,7 @@ namespace osu.Game.Overlays.Settings.Sections.DebugSettings
         protected override LocalisableString Header => @"General";
 
         [BackgroundDependencyLoader]
-        private void load(FrameworkDebugConfigManager config, FrameworkConfigManager frameworkConfig)
+        private void load(FrameworkDebugConfigManager config, FrameworkConfigManager frameworkConfig, OsuConfigManager osuConfig)
         {
             Add(new SettingsItemV2(new FormCheckBox
             {
@@ -26,6 +29,34 @@ namespace osu.Game.Overlays.Settings.Sections.DebugSettings
                 Caption = @"Bypass front-to-back render pass",
                 Current = config.GetBindable<bool>(DebugSetting.BypassFrontToBackPass)
             }));
+
+            Add(new SettingsItemV2(new FormCheckBox
+            {
+                Caption = DebugSettingsStrings.FluidCursorTrail,
+                Current = osuConfig.GetBindable<bool>(OsuSetting.FluidCursorTrail)
+            }));
+
+            Add(new SettingsItemV2(new FormSliderBar<float>
+            {
+                Caption = DebugSettingsStrings.FluidCursorTrailThickness,
+                Current = osuConfig.GetBindable<float>(OsuSetting.FluidCursorTrailThickness),
+                KeyboardStep = 0.05f,
+                LabelFormat = v => $@"{v:0.##}x",
+            }));
+
+            Add(new SettingsItemV2(new FormSliderBar<float>
+            {
+                Caption = DebugSettingsStrings.FluidCursorTrailLength,
+                Current = osuConfig.GetBindable<float>(OsuSetting.FluidCursorTrailLength),
+                KeyboardStep = 0.05f,
+                LabelFormat = v => $@"{v:0.##}x",
+            }));
+
+            Add(new SettingsColour
+            {
+                LabelText = DebugSettingsStrings.FluidCursorTrailColour,
+                Current = osuConfig.GetBindable<Colour4>(OsuSetting.FluidCursorTrailColour),
+            });
         }
     }
 }

@@ -106,6 +106,17 @@ namespace osu.Game.Rulesets.Osu.Tests
         }
 
         [Test]
+        public void TestFluidCursorTrail()
+        {
+            createTest(() => new Container
+            {
+                RelativeSizeAxes = Axes.Both,
+                Scale = new Vector2(10),
+                Child = new FluidCursorTrail(),
+            });
+        }
+
+        [Test]
         public void TestRotation()
         {
             createTest(() =>

@@ -11,6 +11,7 @@ using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Textures;
 using osu.Framework.Input.Bindings;
 using osu.Framework.Input.Events;
+using osu.Game.Configuration;
 using osu.Game.Rulesets.Osu.Configuration;
 using osu.Game.Rulesets.UI;
 using osu.Game.Skinning;
@@ -28,8 +29,10 @@ namespace osu.Game.Rulesets.Osu.UI.Cursor
         private readonly Container<Drawable> fadeContainer;
 
         private readonly Bindable<bool> showTrail = new Bindable<bool>(true);
+        private readonly Bindable<bool> useFluidCursorTrail = new Bindable<bool>();
 
         private readonly SkinnableDrawable cursorTrail;
+        private readonly FluidCursorTrail fluidCursorTrail;
 
         private readonly CursorRippleVisualiser rippleVisualiser;
 
@@ -38,9 +41,10 @@ namespace osu.Game.Rulesets.Osu.UI.Cursor
             InternalChild = fadeContainer = new Container
             {
                 RelativeSizeAxes = Axes.Both,
-                Children = new CompositeDrawable[]
+                Children = new Drawable[]
                 {
                     cursorTrail = new SkinnableDrawable(new OsuSkinComponentLookup(OsuSkinComponents.CursorTrail), _ => new DefaultCursorTrail(), confineMode: ConfineMode.NoScaling),
+                    fluidCursorTrail = new FluidCursorTrail(),
                     rippleVisualiser = new CursorRippleVisualiser(),
                     new SkinnableDrawable(new OsuSkinComponentLookup(OsuSkinComponents.CursorParticles), confineMode: ConfineMode.NoScaling),
                 }
@@ -48,16 +52,18 @@ namespace osu.Game.Rulesets.Osu.UI.Cursor
         }
 
         [BackgroundDependencyLoader(true)]
-        private void load(OsuRulesetConfigManager rulesetConfig)
+        private void load(OsuRulesetConfigManager rulesetConfig, OsuConfigManager config)
         {
             rulesetConfig?.BindWith(OsuRulesetSetting.ShowCursorTrail, showTrail);
+            config.BindWith(OsuSetting.FluidCursorTrail, useFluidCursorTrail);
         }
 
         protected override void LoadComplete()
         {
             base.LoadComplete();
 
-            showTrail.BindValueChanged(v => cursorTrail.FadeTo(v.NewValue ? 1 : 0, 200), true);
+            showTrail.BindValueChanged(_ => updateTrailVisibility(), true);
+            useFluidCursorTrail.BindValueChanged(_ => updateTrailVisibility(), true);
 
             ActiveCursor.CursorScale.BindValueChanged(e =>
             {
@@ -69,9 +75,16 @@ namespace osu.Game.Rulesets.Osu.UI.Cursor
             cursorTrail.OnSkinChanged += updateTrailScale;
         }
 
+        private void updateTrailVisibility()
+        {
+            cursorTrail.FadeTo(showTrail.Value && !useFluidCursorTrail.Value ? 1 : 0, 200);
+            fluidCursorTrail.FadeTo(showTrail.Value && useFluidCursorTrail.Value ? FluidCursorTrail.VISIBLE_ALPHA : 0, 200);
+        }
+
         private void updateTrailScale()
         {
             if (cursorTrail.Drawable is CursorTrail trail) trail.CursorScale = new Vector2(ActiveCursor.CursorScale.Value);
+            fluidCursorTrail.CursorScale = new Vector2(ActiveCursor.CursorScale.Value);
         }
 
         private int downCount;
@@ -90,9 +103,16 @@ namespace osu.Game.Rulesets.Osu.UI.Cursor
 
             if (cursorTrail.Drawable is CursorTrail trail)
             {
-                trail.NewPartScale = ActiveCursor.CurrentExpandedScale;
-                trail.PartRotation = ActiveCursor.CurrentRotation;
+                updateTrailState(trail);
             }
+
+            updateTrailState(fluidCursorTrail);
+        }
+
+        private void updateTrailState(CursorTrail trail)
+        {
+            trail.NewPartScale = ActiveCursor.CurrentExpandedScale;
+            trail.PartRotation = ActiveCursor.CurrentRotation;
         }
 
         public bool OnPressed(KeyBindingPressEvent<OsuAction> e)

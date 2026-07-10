@@ -28,6 +28,7 @@ namespace osu.Game.Rulesets.Osu.UI.Cursor
     public partial class CursorTrail : Drawable, IRequireHighFrequencyMousePosition
     {
         private const int max_sprites = 2048;
+        private static readonly TrailLayer[] default_layers = { new TrailLayer(1, 1, 1) };
 
         /// <summary>
         /// An exponentiating factor to ease the trail fade.
@@ -95,6 +96,10 @@ namespace osu.Game.Rulesets.Osu.UI.Cursor
             }
         }
 
+        protected virtual TrailLayer[] CreateTrailLayers() => default_layers;
+
+        protected readonly record struct TrailLayer(float HeadScale, float TailScale, float Alpha);
+
         [BackgroundDependencyLoader]
         private void load(IRenderer renderer, ShaderManager shaders)
         {
@@ -127,6 +132,11 @@ namespace osu.Game.Rulesets.Osu.UI.Cursor
         /// The amount of time to fade the cursor trail pieces.
         /// </summary>
         protected virtual double FadeDuration => 300;
+
+        /// <summary>
+        /// Multiplier applied to the visible lifetime of each trail part.
+        /// </summary>
+        protected virtual float LifetimeMultiplier => 1;
 
         public override bool IsPresent => true;
 
@@ -244,8 +254,10 @@ namespace osu.Game.Rulesets.Osu.UI.Cursor
 
             private float time;
             private float fadeExponent;
+            private float lifetimeMultiplier;
             private float angle;
             private Vector2 cursorScale;
+            private TrailLayer[] layers;
 
             private readonly TrailPart[] parts = new TrailPart[max_sprites];
             private Vector2 originPosition;
@@ -265,8 +277,10 @@ namespace osu.Game.Rulesets.Osu.UI.Cursor
                 texture = Source.texture;
                 time = Source.time;
                 fadeExponent = Source.FadeExponent;
+                lifetimeMultiplier = Math.Max(Source.LifetimeMultiplier, float.Epsilon);
                 angle = Source.AllowPartRotation ? float.DegreesToRadians(Source.PartRotation) : 0;
                 cursorScale = Source.cursorScale;
+                layers = Source.CreateTrailLayers();
 
                 originPosition = Vector2.Zero;
 
@@ -289,7 +303,12 @@ namespace osu.Game.Rulesets.Osu.UI.Cursor
             {
                 base.Draw(renderer);
 
-                vertexBatch ??= renderer.CreateQuadBatch<TexturedTrailVertex>(max_sprites, 1);
+                int requiredBatchSize = max_sprites * Math.Max(layers.Length, 1);
+                if (vertexBatch == null || vertexBatch.Size < requiredBatchSize)
+                {
+                    vertexBatch?.Dispose();
+                    vertexBatch = renderer.CreateQuadBatch<TexturedTrailVertex>(requiredBatchSize, 1);
+                }
 
                 cursorTrailParameters ??= renderer.CreateUniformBuffer<CursorTrailParameters>();
                 cursorTrailParameters.Data = cursorTrailParameters.Data with
@@ -310,65 +329,83 @@ namespace osu.Game.Rulesets.Osu.UI.Cursor
                 float sin = MathF.Sin(angle);
                 float cos = MathF.Cos(angle);
 
-                foreach (var part in parts)
+                foreach (var layer in layers)
                 {
-                    if (part.InvalidationID == -1)
-                        continue;
-
-                    if (time - part.Time >= 1)
-                        continue;
-
-                    vertexBatch.Add(new TexturedTrailVertex
+                    foreach (var part in parts)
                     {
-                        Position = rotateAround(
-                            new Vector2(
-                                part.Position.X - texture.DisplayWidth * originPosition.X * part.Scale.X * cursorScale.X,
-                                part.Position.Y + texture.DisplayHeight * (1 - originPosition.Y) * part.Scale.Y * cursorScale.Y),
-                            part.Position, sin, cos),
-                        TexturePosition = textureRect.BottomLeft,
-                        TextureRect = new Vector4(0, 0, 1, 1),
-                        Colour = DrawColourInfo.Colour.BottomLeft.Linear,
-                        Time = part.Time
-                    });
+                        if (part.InvalidationID == -1)
+                            continue;
 
-                    vertexBatch.Add(new TexturedTrailVertex
-                    {
-                        Position = rotateAround(
-                            new Vector2(
-                                part.Position.X + texture.DisplayWidth * (1 - originPosition.X) * part.Scale.X * cursorScale.X,
-                                part.Position.Y + texture.DisplayHeight * (1 - originPosition.Y) * part.Scale.Y * cursorScale.Y),
-                            part.Position, sin, cos),
-                        TexturePosition = textureRect.BottomRight,
-                        TextureRect = new Vector4(0, 0, 1, 1),
-                        Colour = DrawColourInfo.Colour.BottomRight.Linear,
-                        Time = part.Time
-                    });
+                        if (time - (part.Time - 1) >= lifetimeMultiplier)
+                            continue;
 
-                    vertexBatch.Add(new TexturedTrailVertex
-                    {
-                        Position = rotateAround(
-                            new Vector2(
-                                part.Position.X + texture.DisplayWidth * (1 - originPosition.X) * part.Scale.X * cursorScale.X,
-                                part.Position.Y - texture.DisplayHeight * originPosition.Y * part.Scale.Y * cursorScale.Y),
-                            part.Position, sin, cos),
-                        TexturePosition = textureRect.TopRight,
-                        TextureRect = new Vector4(0, 0, 1, 1),
-                        Colour = DrawColourInfo.Colour.TopRight.Linear,
-                        Time = part.Time
-                    });
+                        float lifetimeProgress = Math.Clamp((time - (part.Time - 1)) / lifetimeMultiplier, 0, 1);
+                        float headWeight = smoothStep(1 - lifetimeProgress);
+                        float scale = layer.TailScale + (layer.HeadScale - layer.TailScale) * headWeight;
+                        float adjustedPartTime = time + 1 - lifetimeProgress;
+                        Vector2 effectiveScale = new Vector2(part.Scale.X * cursorScale.X * scale, part.Scale.Y * cursorScale.Y * scale);
 
-                    vertexBatch.Add(new TexturedTrailVertex
-                    {
-                        Position = rotateAround(
-                            new Vector2(
-                                part.Position.X - texture.DisplayWidth * originPosition.X * part.Scale.X * cursorScale.X,
-                                part.Position.Y - texture.DisplayHeight * originPosition.Y * part.Scale.Y * cursorScale.Y),
-                            part.Position, sin, cos),
-                        TexturePosition = textureRect.TopLeft,
-                        TextureRect = new Vector4(0, 0, 1, 1),
-                        Colour = DrawColourInfo.Colour.TopLeft.Linear,
-                        Time = part.Time
-                    });
+                        Color4 bottomLeft = DrawColourInfo.Colour.BottomLeft.Linear;
+                        bottomLeft.A *= layer.Alpha;
+                        Color4 bottomRight = DrawColourInfo.Colour.BottomRight.Linear;
+                        bottomRight.A *= layer.Alpha;
+                        Color4 topRight = DrawColourInfo.Colour.TopRight.Linear;
+                        topRight.A *= layer.Alpha;
+                        Color4 topLeft = DrawColourInfo.Colour.TopLeft.Linear;
+                        topLeft.A *= layer.Alpha;
+
+                        vertexBatch.Add(new TexturedTrailVertex
+                        {
+                            Position = rotateAround(
+                                new Vector2(
+                                    part.Position.X - texture.DisplayWidth * originPosition.X * effectiveScale.X,
+                                    part.Position.Y + texture.DisplayHeight * (1 - originPosition.Y) * effectiveScale.Y),
+                                part.Position, sin, cos),
+                            TexturePosition = textureRect.BottomLeft,
+                            TextureRect = new Vector4(0, 0, 1, 1),
+                            Colour = bottomLeft,
+                            Time = adjustedPartTime
+                        });
+
+                        vertexBatch.Add(new TexturedTrailVertex
+                        {
+                            Position = rotateAround(
+                                new Vector2(
+                                    part.Position.X + texture.DisplayWidth * (1 - originPosition.X) * effectiveScale.X,
+                                    part.Position.Y + texture.DisplayHeight * (1 - originPosition.Y) * effectiveScale.Y),
+                                part.Position, sin, cos),
+                            TexturePosition = textureRect.BottomRight,
+                            TextureRect = new Vector4(0, 0, 1, 1),
+                            Colour = bottomRight,
+                            Time = adjustedPartTime
+                        });
+
+                        vertexBatch.Add(new TexturedTrailVertex
+                        {
+                            Position = rotateAround(
+                                new Vector2(
+                                    part.Position.X + texture.DisplayWidth * (1 - originPosition.X) * effectiveScale.X,
+                                    part.Position.Y - texture.DisplayHeight * originPosition.Y * effectiveScale.Y),
+                                part.Position, sin, cos),
+                            TexturePosition = textureRect.TopRight,
+                            TextureRect = new Vector4(0, 0, 1, 1),
+                            Colour = topRight,
+                            Time = adjustedPartTime
+                        });
+
+                        vertexBatch.Add(new TexturedTrailVertex
+                        {
+                            Position = rotateAround(
+                                new Vector2(
+                                    part.Position.X - texture.DisplayWidth * originPosition.X * effectiveScale.X,
+                                    part.Position.Y - texture.DisplayHeight * originPosition.Y * effectiveScale.Y),
+                                part.Position, sin, cos),
+                            TexturePosition = textureRect.TopLeft,
+                            TextureRect = new Vector4(0, 0, 1, 1),
+                            Colour = topLeft,
+                            Time = adjustedPartTime
+                        });
+                    }
                 }
 
                 renderer.PopLocalMatrix();
@@ -384,6 +421,9 @@ namespace osu.Game.Rulesets.Osu.UI.Cursor
 
                 return new Vector2(xTranslated * cos - yTranslated * sin, xTranslated * sin + yTranslated * cos) + origin;
             }
+
+            // Matches the smooth taper used by the fluid cursor shader: a full-size head that narrows towards the oldest parts.
+            private static float smoothStep(float value) => value * value * (3 - 2 * value);
 
             protected override void Dispose(bool isDisposing)
             {
