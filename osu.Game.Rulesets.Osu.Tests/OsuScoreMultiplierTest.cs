@@ -29,6 +29,8 @@ namespace osu.Game.Rulesets.Osu.Tests
             [new Mod[] { new OsuModEasy { Retries = { Value = 5 } } }, 0.5],
             [new Mod[] { new OsuModEasy { Retries = { Value = 8 } } }, 0.4],
 
+            [new Mod[] { new OsuModEZHelper() }, 1],
+
             [new Mod[] { new OsuModNoFail() }, 0.5],
 
             [new Mod[] { new OsuModHalfTime { SpeedChange = { Value = 0.50 } } }, 0.20],

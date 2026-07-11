@@ -15,6 +15,7 @@ namespace osu.Game.Rulesets.Osu.Scoring
             #region Difficulty Reduction
 
             Single<OsuModEasy>(hasMultiplier: 0.5);
+            // EZ Helper
             Single<OsuModNoFail>(hasMultiplier: 0.5);
             Single<OsuModHalfTime>(hasMultiplier: halfTime => rateAdjustMultiplier(halfTime.SpeedChange.Value));
             Single<OsuModDaycore>(hasMultiplier: daycore => rateAdjustMultiplier(daycore.SpeedChange.Value));
