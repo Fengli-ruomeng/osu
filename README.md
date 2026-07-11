@@ -51,3 +51,14 @@ It can enable more gorgeous trajectory effects.
 This effect is actually based on the implementation logic of the Osu Dancer project.
 
 It also allows for some customization.
+
+
+### 4. PP Calculator
+
+Currently, Std mode and Mania mode are supported, and the remaining modes will be updated soon.
+
+It allows you to easily and quickly view the current song's PP, as well as PP under various possible conditions.
+
+Since it uses the game's built-in PP calculation function, updating this function is also very convenient.
+
+Since Classic is already an Unranked Mod, there is no PP computation support for Classic.

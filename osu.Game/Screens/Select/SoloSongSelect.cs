@@ -33,6 +33,8 @@ namespace osu.Game.Screens.Select
 
         private PlayerLoader? playerLoader;
         private IReadOnlyList<Mod>? modsAtGameplayStart;
+        private PerformanceCalculatorOverlay performanceCalculatorOverlay = null!;
+        private IDisposable? performanceCalculatorOverlayRegistration;
 
         [Cached]
         private readonly PracticeModeState practiceMode = new PracticeModeState();
@@ -55,6 +57,9 @@ namespace osu.Game.Screens.Select
         [Resolved]
         private OsuGame? game { get; set; }
 
+        [Resolved]
+        private IOverlayManager? overlayManager { get; set; }
+
         private Sample? sampleConfirmSelection { get; set; }
 
         [BackgroundDependencyLoader]
@@ -63,6 +68,13 @@ namespace osu.Game.Screens.Select
             sampleConfirmSelection = audio.Samples.Get(@"SongSelect/confirm-selection");
 
             AddInternal(new SongSelectTouchInputDetector());
+            LoadComponent(performanceCalculatorOverlay = new PerformanceCalculatorOverlay());
+        }
+
+        protected override void LoadComplete()
+        {
+            base.LoadComplete();
+            performanceCalculatorOverlayRegistration = overlayManager?.RegisterBlockingOverlay(performanceCalculatorOverlay);
         }
 
         public override IEnumerable<OsuMenuItem> GetForwardActions(BeatmapInfo beatmap)
@@ -171,7 +183,14 @@ namespace osu.Game.Screens.Select
         {
             var buttons = base.CreateFooterButtons().ToList();
             buttons.Insert(1, new FooterButtonPractice(practiceMode));
+            buttons.Insert(1, new FooterButtonPerformanceCalculator(performanceCalculatorOverlay));
             return buttons;
+        }
+
+        protected override void Dispose(bool isDisposing)
+        {
+            performanceCalculatorOverlayRegistration?.Dispose();
+            base.Dispose(isDisposing);
         }
 
         public void Edit(BeatmapInfo beatmap)
