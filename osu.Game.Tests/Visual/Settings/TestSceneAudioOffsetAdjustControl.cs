@@ -12,6 +12,7 @@ using osu.Framework.Testing;
 using osu.Framework.Utils;
 using osu.Game.Configuration;
 using osu.Game.Overlays;
+using osu.Game.Overlays.Settings;
 using osu.Game.Overlays.Settings.Sections.Audio;
 using osu.Game.Scoring;
 using osu.Game.Tests.Visual.Ranking;
@@ -78,6 +79,12 @@ namespace osu.Game.Tests.Visual.Settings
         }
 
         [Test]
+        public void TestOffsetWizardButtonPresent()
+        {
+            AddAssert("wizard button present", () => adjustControl.ChildrenOfType<SettingsButtonV2>().Single().Text.ToString(), () => Is.EqualTo("Offset wizard"));
+        }
+
+        [Test]
         public void TestRounding()
         {
             AddStep("set new score", () => statics.SetValue(Static.LastLocalUserScore, new ScoreInfo
@@ -87,7 +94,7 @@ namespace osu.Game.Tests.Visual.Settings
             }));
 
             checkButtonEnabled();
-            AddStep("click button", () => adjustControl.ChildrenOfType<Button>().Single().TriggerClick());
+            AddStep("click button", () => getApplySuggestionButton().TriggerClick());
             checkButtonDisabled();
             AddAssert("global offset set correctly", () => localConfig.Get<double>(OsuSetting.AudioOffset), () => Is.EqualTo(-1));
         }
@@ -105,7 +112,7 @@ namespace osu.Game.Tests.Visual.Settings
             AddStep("adjust global offset", () => localConfig.SetValue(OsuSetting.AudioOffset, 50.0));
             checkButtonEnabled();
 
-            AddStep("click button", () => adjustControl.ChildrenOfType<Button>().Single().TriggerClick());
+            AddStep("click button", () => getApplySuggestionButton().TriggerClick());
             checkButtonDisabled();
             AddAssert("global offset set correctly", () => localConfig.Get<double>(OsuSetting.AudioOffset), () => Is.EqualTo(0));
             AddStep("clear history", () => tracker.ClearHistory());
@@ -158,13 +165,15 @@ namespace osu.Game.Tests.Visual.Settings
 
         private void checkButtonDisabled()
         {
-            AddAssert("button is disabled", () => adjustControl.ChildrenOfType<Button>().Single().Enabled.Value, () => Is.False);
+            AddAssert("button is disabled", () => getApplySuggestionButton().Enabled.Value, () => Is.False);
         }
 
         private void checkButtonEnabled()
         {
-            AddAssert("button is enabled", () => adjustControl.ChildrenOfType<Button>().Single().Enabled.Value, () => Is.True);
+            AddAssert("button is enabled", () => getApplySuggestionButton().Enabled.Value, () => Is.True);
         }
+
+        private Button getApplySuggestionButton() => adjustControl.ChildrenOfType<Button>().Single(button => button is not SettingsButtonV2);
 
         private void setScore(double averageHitError)
         {

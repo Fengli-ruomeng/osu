@@ -42,7 +42,7 @@ namespace osu.Game.Overlays.Settings.Sections.Audio
         private OverlayColourProvider colourProvider { get; set; } = null!;
 
         [BackgroundDependencyLoader]
-        private void load(SessionAverageHitErrorTracker hitErrorTracker)
+        private void load(SessionAverageHitErrorTracker hitErrorTracker, IDialogOverlay? dialogOverlay)
         {
             averageHitErrorHistory.BindTo(hitErrorTracker.AverageHitErrorHistory);
 
@@ -65,6 +65,12 @@ namespace osu.Game.Overlays.Settings.Sections.Audio
                         LabelFormat = v => $"{v:N0} ms",
                         TooltipFormat = BeatmapOffsetControl.GetOffsetExplanatoryText,
                     }),
+                    new SettingsButtonV2
+                    {
+                        Text = AudioSettingsStrings.OffsetWizard,
+                        Keywords = new[] { "calibration", "latency", "metronome" },
+                        Action = () => dialogOverlay?.Push(new GlobalOffsetCalibrationDialog(current.Current)),
+                    },
                     new Container
                     {
                         RelativeSizeAxes = Axes.X,

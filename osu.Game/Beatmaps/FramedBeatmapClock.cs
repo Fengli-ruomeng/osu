@@ -146,18 +146,21 @@ namespace osu.Game.Beatmaps
 
             Debug.Assert(platformOffsetClock != null);
 
+            platformOffsetClock.Offset = GetPlatformOffset(audioManager.UseExperimentalWasapi.Value);
+        }
+
+        /// <summary>
+        /// Returns the platform offset which is applied to gameplay clocks in addition to the user's global offset.
+        /// </summary>
+        public static double GetPlatformOffset(bool useExperimentalAudio)
+        {
             switch (RuntimeInfo.OS)
             {
                 case RuntimeInfo.Platform.Windows:
-                    platformOffsetClock.Offset = WINDOWS_BASE_AUDIO_OFFSET;
-
-                    if (audioManager.UseExperimentalWasapi.Value)
-                        platformOffsetClock.Offset += WINDOWS_EXPERIMENTAL_AUDIO_OFFSET;
-                    return;
+                    return WINDOWS_BASE_AUDIO_OFFSET + (useExperimentalAudio ? WINDOWS_EXPERIMENTAL_AUDIO_OFFSET : 0);
 
                 default:
-                    platformOffsetClock.Offset = 0;
-                    break;
+                    return 0;
             }
         }
 
