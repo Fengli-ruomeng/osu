@@ -41,6 +41,8 @@ namespace osu.Game.Screens.OnlinePlay.Matchmaking.Match.BeatmapSelect
         private readonly PanelGridContainer panelGridContainer;
         private readonly Container<MatchmakingSelectPanel> rollContainer;
         private readonly OsuScrollContainer scroll;
+        private readonly Func<MatchmakingPlaylistItem, MatchmakingSelectPanel> panelFactory;
+        private readonly bool includeRandomPanel;
 
         private bool allowSelection = true;
 
@@ -49,8 +51,11 @@ namespace osu.Game.Screens.OnlinePlay.Matchmaking.Match.BeatmapSelect
         private Sample? swooshSample;
         private double? lastSamplePlayback;
 
-        public BeatmapSelectGrid()
+        public BeatmapSelectGrid(Func<MatchmakingPlaylistItem, MatchmakingSelectPanel>? panelFactory = null, bool includeRandomPanel = true)
         {
+            this.panelFactory = panelFactory ?? (item => new MatchmakingSelectPanelBeatmap(item));
+            this.includeRandomPanel = includeRandomPanel;
+
             InternalChildren = new Drawable[]
             {
                 scroll = new OsuScrollContainer
@@ -88,28 +93,29 @@ namespace osu.Game.Screens.OnlinePlay.Matchmaking.Match.BeatmapSelect
             {
                 playlistItems[item.ID] = item;
 
-                var panel = panelLookup[item.ID] = new MatchmakingSelectPanelBeatmap(item)
-                {
-                    AllowSelection = allowSelection,
-                    Anchor = Anchor.TopCentre,
-                    Origin = Anchor.TopCentre,
-                    Action = i => ItemSelected?.Invoke(i),
-                    Depth = -(float)item.PlaylistItem.StarRating
-                };
+                MatchmakingSelectPanel panel = panelLookup[item.ID] = panelFactory(item);
+                panel.AllowSelection = allowSelection;
+                panel.Anchor = Anchor.TopCentre;
+                panel.Origin = Anchor.TopCentre;
+                panel.Action = i => ItemSelected?.Invoke(i);
+                panel.Depth = -(float)item.PlaylistItem.StarRating;
 
                 panelGridContainer.Add(panel);
                 panelGridContainer.SetLayoutPosition(panel, (float)panel.Item.StarRating);
             }
 
-            panelLookup[-1] = randomPanel = new MatchmakingSelectPanelRandom(new MultiplayerPlaylistItem { ID = -1 })
+            if (includeRandomPanel)
             {
-                AllowSelection = allowSelection,
-                Anchor = Anchor.TopCentre,
-                Origin = Anchor.TopCentre,
-                Action = i => ItemSelected?.Invoke(i),
-            };
-            panelGridContainer.Add(randomPanel);
-            panelGridContainer.SetLayoutPosition(randomPanel, float.MinValue);
+                panelLookup[-1] = randomPanel = new MatchmakingSelectPanelRandom(new MultiplayerPlaylistItem { ID = -1 })
+                {
+                    AllowSelection = allowSelection,
+                    Anchor = Anchor.TopCentre,
+                    Origin = Anchor.TopCentre,
+                    Action = i => ItemSelected?.Invoke(i),
+                };
+                panelGridContainer.Add(randomPanel);
+                panelGridContainer.SetLayoutPosition(randomPanel, float.MinValue);
+            }
 
             const double enter_duration = 500;
 

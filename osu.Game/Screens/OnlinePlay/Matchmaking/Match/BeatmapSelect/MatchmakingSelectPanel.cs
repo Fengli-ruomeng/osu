@@ -31,7 +31,7 @@ namespace osu.Game.Screens.OnlinePlay.Matchmaking.Match.BeatmapSelect
 
         public readonly MultiplayerPlaylistItem Item;
 
-        public Action<MultiplayerPlaylistItem>? Action { private get; init; }
+        public Action<MultiplayerPlaylistItem>? Action { private get; set; }
 
         protected override Container<Drawable> Content { get; } = new Container { RelativeSizeAxes = Axes.Both };
 

@@ -3,6 +3,7 @@
 
 using System;
 using osu.Framework.Allocation;
+using osu.Framework.Bindables;
 using osu.Framework.Extensions.ObjectExtensions;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
@@ -18,6 +19,8 @@ namespace osu.Game.Screens.OnlinePlay.Matchmaking.Match
     {
         public partial class TimerText : CompositeDrawable
         {
+            private readonly MatchmakingStageState? localState;
+
             [Resolved]
             private MultiplayerClient client { get; set; } = null!;
 
@@ -25,8 +28,9 @@ namespace osu.Game.Screens.OnlinePlay.Matchmaking.Match
 
             private DateTimeOffset countdownEndTime;
 
-            public TimerText()
+            public TimerText(MatchmakingStageState? localState = null)
             {
+                this.localState = localState;
                 AutoSizeAxes = Axes.X;
                 Height = 18;
             }
@@ -46,6 +50,12 @@ namespace osu.Game.Screens.OnlinePlay.Matchmaking.Match
             protected override void LoadComplete()
             {
                 base.LoadComplete();
+
+                if (localState != null)
+                {
+                    localState.CountdownEnd.BindValueChanged(onLocalCountdownChanged, true);
+                    return;
+                }
 
                 client.CountdownStarted += onCountdownStarted;
                 client.CountdownStopped += onCountdownStopped;
@@ -91,9 +101,20 @@ namespace osu.Game.Screens.OnlinePlay.Matchmaking.Match
                 countdownEndTime = DateTimeOffset.Now;
             });
 
+            private void onLocalCountdownChanged(ValueChangedEvent<DateTimeOffset?> e) => Scheduler.Add(() =>
+            {
+                countdownEndTime = e.NewValue ?? DateTimeOffset.Now;
+            });
+
             protected override void Dispose(bool isDisposing)
             {
                 base.Dispose(isDisposing);
+
+                if (localState != null)
+                {
+                    localState.CountdownEnd.ValueChanged -= onLocalCountdownChanged;
+                    return;
+                }
 
                 if (client.IsNotNull())
                 {

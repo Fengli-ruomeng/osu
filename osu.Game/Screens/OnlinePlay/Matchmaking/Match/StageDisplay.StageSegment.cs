@@ -5,6 +5,7 @@ using System;
 using osu.Framework.Allocation;
 using osu.Framework.Audio;
 using osu.Framework.Audio.Sample;
+using osu.Framework.Bindables;
 using osu.Framework.Extensions.ObjectExtensions;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
@@ -30,6 +31,7 @@ namespace osu.Game.Screens.OnlinePlay.Matchmaking.Match
             public readonly int? Round;
 
             private readonly MatchmakingStage stage;
+            private readonly MatchmakingStageState? localState;
 
             private readonly LocalisableString displayText;
             private Drawable progressBar = null!;
@@ -46,12 +48,13 @@ namespace osu.Game.Screens.OnlinePlay.Matchmaking.Match
 
             public float Progress => progressBar.Width;
 
-            public StageSegment(int? round, MatchmakingStage stage, LocalisableString displayText)
+            public StageSegment(int? round, MatchmakingStage stage, LocalisableString displayText, MatchmakingStageState? localState = null)
             {
                 Round = round;
 
                 this.stage = stage;
                 this.displayText = displayText;
+                this.localState = localState;
 
                 AutoSizeAxes = Axes.Both;
 
@@ -121,6 +124,14 @@ namespace osu.Game.Screens.OnlinePlay.Matchmaking.Match
             {
                 base.LoadComplete();
 
+                if (localState != null)
+                {
+                    localState.Stage.BindValueChanged(onLocalStageChanged, true);
+                    localState.CurrentRound.BindValueChanged(onLocalRoundChanged);
+                    localState.CountdownEnd.BindValueChanged(onLocalCountdownChanged, true);
+                    return;
+                }
+
                 client.MatchRoomStateChanged += onMatchRoomStateChanged;
                 client.CountdownStarted += onCountdownStarted;
                 client.CountdownStopped += onCountdownStopped;
@@ -154,17 +165,28 @@ namespace osu.Game.Screens.OnlinePlay.Matchmaking.Match
 
             private void onMatchRoomStateChanged(MatchRoomState? state) => Scheduler.Add(() =>
             {
-                bool wasActive = Active;
-
-                Active = false;
-
                 if (state is not MatchmakingRoomState roomState)
                     return;
 
-                if (Round != null && roomState.CurrentRound != Round)
+                updateActive(roomState.Stage, roomState.CurrentRound);
+            });
+
+            private void onLocalStageChanged(ValueChangedEvent<MatchmakingStage> _) => Scheduler.Add(updateFromLocalState);
+
+            private void onLocalRoundChanged(ValueChangedEvent<int> _) => Scheduler.Add(updateFromLocalState);
+
+            private void updateFromLocalState()
+            {
+                if (localState == null)
                     return;
 
-                Active = stage == roomState.Stage;
+                updateActive(localState.Stage.Value, localState.CurrentRound.Value);
+            }
+
+            private void updateActive(MatchmakingStage currentStage, int currentRound)
+            {
+                bool wasActive = Active;
+                Active = (Round == null || currentRound == Round) && stage == currentStage;
 
                 if (wasActive)
                     progressBar.Width = 1;
@@ -172,9 +194,9 @@ namespace osu.Game.Screens.OnlinePlay.Matchmaking.Match
                 mainContent.ScaleTo(Active ? 1.3f : 1, 500, Easing.OutQuint);
 
                 bool isPreparing =
-                    (stage == MatchmakingStage.RoundWarmupTime && roomState.Stage == MatchmakingStage.WaitingForClientsJoin) ||
-                    (stage == MatchmakingStage.GameplayWarmupTime && roomState.Stage == MatchmakingStage.WaitingForClientsBeatmapDownload) ||
-                    (stage == MatchmakingStage.ResultsDisplaying && roomState.Stage == MatchmakingStage.Gameplay);
+                    (stage == MatchmakingStage.RoundWarmupTime && currentStage == MatchmakingStage.WaitingForClientsJoin) ||
+                    (stage == MatchmakingStage.GameplayWarmupTime && currentStage == MatchmakingStage.WaitingForClientsBeatmapDownload) ||
+                    (stage == MatchmakingStage.ResultsDisplaying && currentStage == MatchmakingStage.Gameplay);
 
                 if (isPreparing)
                 {
@@ -182,6 +204,23 @@ namespace osu.Game.Screens.OnlinePlay.Matchmaking.Match
                          .Then()
                          .FadeTo(0.5f, 500)
                          .Loop();
+                }
+                else
+                {
+                    arrow.ClearTransforms();
+                    arrow.FadeTo(Active ? 1 : 0.5f, 200);
+                }
+            }
+
+            private void onLocalCountdownChanged(ValueChangedEvent<DateTimeOffset?> e) => Scheduler.Add(() =>
+            {
+                countdownStartTime = DateTimeOffset.Now;
+                countdownEndTime = e.NewValue ?? countdownStartTime;
+
+                if (Active && e.NewValue != null)
+                {
+                    this.FadeIn(200);
+                    segmentStartedSample?.Play();
                 }
             });
 
@@ -216,6 +255,14 @@ namespace osu.Game.Screens.OnlinePlay.Matchmaking.Match
             protected override void Dispose(bool isDisposing)
             {
                 base.Dispose(isDisposing);
+
+                if (localState != null)
+                {
+                    localState.Stage.ValueChanged -= onLocalStageChanged;
+                    localState.CurrentRound.ValueChanged -= onLocalRoundChanged;
+                    localState.CountdownEnd.ValueChanged -= onLocalCountdownChanged;
+                    return;
+                }
 
                 if (client.IsNotNull())
                 {

@@ -216,6 +216,7 @@ namespace osu.Game.Rulesets.Osu
                     return new Mod[]
                     {
                         new MultiMod(new OsuModAutoplay(), new OsuModCinema()),
+                        new OsuModLeagueAutoplay(),
                         new OsuModRelax(),
                         new OsuModAutopilot(),
                         new OsuModSpunOut(),

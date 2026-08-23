@@ -116,6 +116,7 @@ namespace osu.Game.Screens.OnlinePlay.Matchmaking.Match
 
         private PlayerPanelDisplayMode displayMode = PlayerPanelDisplayMode.Horizontal;
         private bool hasQuit;
+        private readonly bool bindToMultiplayerClient;
 
         private enum InteractionSampleType
         {
@@ -129,13 +130,14 @@ namespace osu.Game.Screens.OnlinePlay.Matchmaking.Match
         private double samplePitch;
         private double? lastSamplePlayback;
 
-        public PlayerPanel(MultiplayerRoomUser user)
+        public PlayerPanel(MultiplayerRoomUser user, bool bindToMultiplayerClient = true)
             : base(HoverSampleSet.Button)
         {
             ArgumentNullException.ThrowIfNull(user.User);
 
             User = user.User;
             RoomUser = user;
+            this.bindToMultiplayerClient = bindToMultiplayerClient;
 
             base.Action = viewProfile = () =>
             {
@@ -286,11 +288,14 @@ namespace osu.Game.Screens.OnlinePlay.Matchmaking.Match
 
             updateLayout(true);
 
-            client.MatchRoomStateChanged += onRoomStateChanged;
-            client.MatchEvent += onMatchEvent;
-            client.BeatmapAvailabilityChanged += onBeatmapAvailabilityChanged;
+            if (bindToMultiplayerClient)
+            {
+                client.MatchRoomStateChanged += onRoomStateChanged;
+                client.MatchEvent += onMatchEvent;
+                client.BeatmapAvailabilityChanged += onBeatmapAvailabilityChanged;
 
-            onRoomStateChanged(client.Room!.MatchState);
+                onRoomStateChanged(client.Room?.MatchState);
+            }
 
             avatar.ScaleTo(0)
                   .ScaleTo(1, 500, Easing.OutElasticHalf)
@@ -459,9 +464,17 @@ namespace osu.Game.Screens.OnlinePlay.Matchmaking.Match
             if (userScore.Placement == null)
                 return;
 
-            rankText.Text = userScore.Placement.Value.Ordinalize(CultureInfo.CurrentCulture);
-            rankText.FadeColour(SubScreenResults.ColourForPlacement(userScore.Placement.Value));
-            scoreText.Text = $"{userScore.Points} pts";
+            SetPlacementAndPoints(userScore.Placement.Value, userScore.Points);
+        });
+
+        /// <summary>
+        /// Updates the placement and points shown by this panel when it is used outside an online matchmaking room.
+        /// </summary>
+        public void SetPlacementAndPoints(int placement, int points) => Scheduler.Add(() =>
+        {
+            rankText.Text = placement.Ordinalize(CultureInfo.CurrentCulture);
+            rankText.FadeColour(SubScreenResults.ColourForPlacement(placement));
+            scoreText.Text = $"{points} pts";
         });
 
         private int consecutiveJumps;
@@ -574,7 +587,7 @@ namespace osu.Game.Screens.OnlinePlay.Matchmaking.Match
         {
             base.Dispose(isDisposing);
 
-            if (client.IsNotNull())
+            if (bindToMultiplayerClient && client.IsNotNull())
             {
                 client.MatchRoomStateChanged -= onRoomStateChanged;
                 client.MatchEvent -= onMatchEvent;

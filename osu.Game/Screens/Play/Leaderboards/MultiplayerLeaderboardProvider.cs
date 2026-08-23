@@ -38,6 +38,7 @@ namespace osu.Game.Screens.Play.Leaderboards
         public bool HasTeams => TeamScores.Count > 0;
 
         private readonly MultiplayerRoomUser[] users;
+        private readonly IBindableList<int>? providedPlayingUserIds;
 
         private readonly Bindable<ScoringMode> scoringMode = new Bindable<ScoringMode>();
         private readonly IBindableList<int> playingUserIds = new BindableList<int>();
@@ -56,9 +57,10 @@ namespace osu.Game.Screens.Play.Leaderboards
 
         private readonly Cached sorting = new Cached();
 
-        public MultiplayerLeaderboardProvider(MultiplayerRoomUser[] users)
+        public MultiplayerLeaderboardProvider(MultiplayerRoomUser[] users, IBindableList<int>? playingUserIds = null)
         {
             this.users = users;
+            providedPlayingUserIds = playingUserIds;
         }
 
         [BackgroundDependencyLoader]
@@ -80,52 +82,55 @@ namespace osu.Game.Screens.Play.Leaderboards
                     TeamScores.Add(team, new BindableLong());
             }
 
-            userLookupCache.GetUsersAsync(users.Select(u => u.UserID).ToArray(), cancellationToken)
-                           .ContinueWith(task =>
-                           {
-                               Schedule(() =>
-                               {
-                                   var lookedUpUsers = task.GetResultSafely();
+            if (users.All(user => user.User != null))
+                populateUsers(users.Select(user => user.User).ToArray());
+            else
+            {
+                userLookupCache.GetUsersAsync(users.Select(u => u.UserID).ToArray(), cancellationToken)
+                               .ContinueWith(task => populateUsers(task.GetResultSafely()), cancellationToken);
+            }
 
-                                   for (int i = 0; i < lookedUpUsers.Length; i++)
-                                   {
-                                       var user = lookedUpUsers[i] ?? APIUser.UnknownUser(users[i].UserID);
+            void populateUsers(APIUser?[] lookedUpUsers) => Schedule(() =>
+            {
+                for (int i = 0; i < lookedUpUsers.Length; i++)
+                {
+                    var user = users[i].User ?? lookedUpUsers[i] ?? APIUser.UnknownUser(users[i].UserID);
+                    var trackedUser = UserScores[users[i].UserID];
 
-                                       var trackedUser = UserScores[user.Id];
-
-                                       var leaderboardScore = new GameplayLeaderboardScore(
-                                           user,
-                                           trackedUser.ScoreProcessor,
-                                           user.Id == api.LocalUser.Value.Id,
-                                           GameplayLeaderboardScore.ComboDisplayMode.Current)
-                                       {
-                                           HasQuit = { BindTarget = trackedUser.UserQuit },
-                                           TeamColour = UserScores[user.OnlineID].Team is int team ? getTeamColour(team) : null,
-                                       };
-                                       leaderboardScore.TotalScore.BindValueChanged(_ => sorting.Invalidate());
-                                       leaderboardScore.DisplayOrder.BindValueChanged(_ => sorting.Invalidate(), true);
-                                       scores.Add(leaderboardScore);
-                                   }
-                               });
-                           }, cancellationToken);
+                    var leaderboardScore = new GameplayLeaderboardScore(
+                        user,
+                        trackedUser.ScoreProcessor,
+                        user.Id == api.LocalUser.Value.Id,
+                        GameplayLeaderboardScore.ComboDisplayMode.Current)
+                    {
+                        HasQuit = { BindTarget = trackedUser.UserQuit },
+                        TeamColour = trackedUser.Team is int team ? getTeamColour(team) : null,
+                    };
+                    leaderboardScore.TotalScore.BindValueChanged(_ => sorting.Invalidate());
+                    leaderboardScore.DisplayOrder.BindValueChanged(_ => sorting.Invalidate(), true);
+                    scores.Add(leaderboardScore);
+                }
+            });
         }
 
         protected override void LoadComplete()
         {
             base.LoadComplete();
 
+            IBindableList<int> sourcePlayingUserIds = providedPlayingUserIds ?? multiplayerClient.CurrentMatchPlayingUserIds;
+
             // BindableList handles binding in a really bad way (Clear then AddRange) so we need to do this manually..
             foreach (var user in users)
             {
                 spectatorClient.WatchUser(user.UserID);
 
-                if (!multiplayerClient.CurrentMatchPlayingUserIds.Contains(user.UserID))
+                if (!sourcePlayingUserIds.Contains(user.UserID))
                     playingUsersChanged(this, new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Remove, new[] { user.UserID }));
             }
 
             // bind here is to support players leaving the match.
             // new players are not supported.
-            playingUserIds.BindTo(multiplayerClient.CurrentMatchPlayingUserIds);
+            playingUserIds.BindTo(sourcePlayingUserIds);
             playingUserIds.BindCollectionChanged(playingUsersChanged);
 
             Scheduler.AddDelayed(sort, 1000, true);

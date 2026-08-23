@@ -47,6 +47,7 @@ namespace osu.Game.Screens.Menu
         public Action? OnSolo;
         public Action? OnSettings;
         public Action? OnMultiplayer;
+        public Action? OnLeaguePlay;
         public Action? OnQuickPlay;
         public Action? OnRankedPlay;
         public Action? OnPlaylists;
@@ -163,6 +164,7 @@ namespace osu.Game.Screens.Menu
                 Padding = new MarginPadding { Left = WEDGE_WIDTH }
             });
             buttonsMulti.Add(new MainMenuButton(ButtonSystemStrings.RankedPlay, @"button-daily-select", FontAwesome.Solid.Crown, new Color4(94, 63, 186, 255), onRankedPlay, Key.R));
+            buttonsMulti.Add(new MainMenuButton("league play", @"button-daily-select", OsuIcon.Tournament, new Color4(116, 78, 204, 255), (_, _) => OnLeaguePlay?.Invoke(), Key.G));
             // disabled for now to give ranked play space.
             // buttonsMulti.Add(new MainMenuButton(ButtonSystemStrings.QuickPlay, @"button-daily-select", FontAwesome.Solid.Bolt, new Color4(94, 63, 186, 255), onQuickPlay, Key.Q));
             buttonsMulti.ForEach(b => b.VisibleState = ButtonSystemState.Multi);

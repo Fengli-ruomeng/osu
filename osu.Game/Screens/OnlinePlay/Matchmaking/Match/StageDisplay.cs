@@ -30,8 +30,8 @@ namespace osu.Game.Screens.OnlinePlay.Matchmaking.Match
     {
         public const float HEIGHT = 96;
 
-        // TODO: get this from somewhere?
-        private const int round_count = 5;
+        private readonly int roundCount;
+        private readonly MatchmakingStageState? localState;
 
         private OsuScrollContainer scroll = null!;
         private FillFlowContainer<StageSegment> flow = null!;
@@ -39,7 +39,15 @@ namespace osu.Game.Screens.OnlinePlay.Matchmaking.Match
         private CurrentRoundDisplay roundDisplay = null!;
 
         public StageDisplay()
+            : this(5)
         {
+        }
+
+        public StageDisplay(int roundCount, MatchmakingStageState? localState = null)
+        {
+            this.roundCount = roundCount;
+            this.localState = localState;
+
             RelativeSizeAxes = Axes.X;
             AutoSizeAxes = Axes.Y;
         }
@@ -81,19 +89,19 @@ namespace osu.Game.Screens.OnlinePlay.Matchmaking.Match
                                 Direction = FillDirection.Horizontal,
                             },
                         },
-                        new TimerText
+                        new TimerText(localState)
                         {
                             Y = -38,
                             Anchor = Anchor.Centre,
                             Origin = Anchor.Centre
                         },
-                        new StatusText
+                        new StatusText(localState)
                         {
                             Y = 32,
                             Anchor = Anchor.Centre,
                             Origin = Anchor.Centre
                         },
-                        roundDisplay = new CurrentRoundDisplay
+                        roundDisplay = new CurrentRoundDisplay(roundCount)
                         {
                             X = 12,
                             Anchor = Anchor.CentreLeft,
@@ -103,17 +111,17 @@ namespace osu.Game.Screens.OnlinePlay.Matchmaking.Match
                 },
             };
 
-            flow.Add(new StageSegment(null, MatchmakingStage.WaitingForClientsJoin, "Waiting for other users"));
+            flow.Add(new StageSegment(null, MatchmakingStage.WaitingForClientsJoin, "Waiting for other users", localState));
 
-            for (int i = 1; i <= round_count; i++)
+            for (int i = 1; i <= roundCount; i++)
             {
-                flow.Add(new StageSegment(i, MatchmakingStage.RoundWarmupTime, "Next Round"));
-                flow.Add(new StageSegment(i, MatchmakingStage.UserBeatmapSelect, "Beatmap Selection"));
-                flow.Add(new StageSegment(i, MatchmakingStage.GameplayWarmupTime, "Get Ready"));
-                flow.Add(new StageSegment(i, MatchmakingStage.ResultsDisplaying, "Results"));
+                flow.Add(new StageSegment(i, MatchmakingStage.RoundWarmupTime, "Next Round", localState));
+                flow.Add(new StageSegment(i, MatchmakingStage.UserBeatmapSelect, "Beatmap Selection", localState));
+                flow.Add(new StageSegment(i, MatchmakingStage.GameplayWarmupTime, "Get Ready", localState));
+                flow.Add(new StageSegment(i, MatchmakingStage.ResultsDisplaying, "Results", localState));
             }
 
-            flow.Add(new StageSegment(round_count, MatchmakingStage.Ended, "Match End"));
+            flow.Add(new StageSegment(roundCount, MatchmakingStage.Ended, "Match End", localState));
         }
 
         protected override void Update()
@@ -156,6 +164,8 @@ namespace osu.Game.Screens.OnlinePlay.Matchmaking.Match
 
         private partial class CurrentRoundDisplay : CompositeDrawable
         {
+            private readonly int roundCount;
+
             private OsuSpriteText text = null!;
 
             private Circle innerCircle = null!;
@@ -167,6 +177,11 @@ namespace osu.Game.Screens.OnlinePlay.Matchmaking.Match
             private SampleChannel? swishChannel;
             private SampleChannel? swooshChannel;
             private SampleChannel? roundUpChannel;
+
+            public CurrentRoundDisplay(int roundCount)
+            {
+                this.roundCount = roundCount;
+            }
 
             [BackgroundDependencyLoader]
             private void load(OverlayColourProvider colours, AudioManager audio)
@@ -245,7 +260,7 @@ namespace osu.Game.Screens.OnlinePlay.Matchmaking.Match
                         Position = new Vector2(10, 11),
                         Anchor = Anchor.Centre,
                         Origin = Anchor.Centre,
-                        Text = $"{round_count}"
+                        Text = $"{roundCount}"
                     },
                 };
 
@@ -293,7 +308,7 @@ namespace osu.Game.Screens.OnlinePlay.Matchmaking.Match
 
                     Scheduler.AddDelayed(() =>
                     {
-                        progress.ProgressTo((float)round / round_count, 500, Easing.InOutQuart);
+                        progress.ProgressTo((float)round / roundCount, 500, Easing.InOutQuart);
 
                         Scheduler.AddDelayed(() =>
                         {

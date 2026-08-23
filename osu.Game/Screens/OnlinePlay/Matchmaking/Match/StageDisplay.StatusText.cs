@@ -4,6 +4,7 @@
 using osu.Framework.Allocation;
 using osu.Framework.Audio;
 using osu.Framework.Audio.Sample;
+using osu.Framework.Bindables;
 using osu.Framework.Extensions.ObjectExtensions;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
@@ -19,6 +20,8 @@ namespace osu.Game.Screens.OnlinePlay.Matchmaking.Match
     {
         public partial class StatusText : CompositeDrawable
         {
+            private readonly MatchmakingStageState? localState;
+
             [Resolved]
             private MultiplayerClient client { get; set; } = null!;
 
@@ -27,8 +30,9 @@ namespace osu.Game.Screens.OnlinePlay.Matchmaking.Match
             private Sample? textChangedSample;
             private double? lastSamplePlayback;
 
-            public StatusText()
+            public StatusText(MatchmakingStageState? localState = null)
             {
+                this.localState = localState;
                 AutoSizeAxes = Axes.X;
                 Height = 16;
             }
@@ -51,6 +55,12 @@ namespace osu.Game.Screens.OnlinePlay.Matchmaking.Match
             {
                 base.LoadComplete();
 
+                if (localState != null)
+                {
+                    localState.Stage.BindValueChanged(onLocalStageChanged, true);
+                    return;
+                }
+
                 client.MatchRoomStateChanged += onMatchRoomStateChanged;
                 onMatchRoomStateChanged(client.Room!.MatchState);
             }
@@ -60,18 +70,25 @@ namespace osu.Game.Screens.OnlinePlay.Matchmaking.Match
                 if (state is not MatchmakingRoomState matchmakingState)
                     return;
 
-                text.Text = getTextForStatus(matchmakingState.Stage);
+                updateStatus(matchmakingState.Stage);
+            });
+
+            private void onLocalStageChanged(ValueChangedEvent<MatchmakingStage> e) => Scheduler.Add(() => updateStatus(e.NewValue));
+
+            private void updateStatus(MatchmakingStage stage)
+            {
+                text.Text = getTextForStatus(stage);
 
                 if (text.Text == string.Empty || (lastSamplePlayback != null && Time.Current - lastSamplePlayback < OsuGameBase.SAMPLE_DEBOUNCE_TIME))
                     return;
 
-                if (matchmakingState.Stage is MatchmakingStage.WaitingForClientsJoin or MatchmakingStage.WaitingForClientsBeatmapDownload)
+                if (stage is MatchmakingStage.WaitingForClientsJoin or MatchmakingStage.WaitingForClientsBeatmapDownload)
                 {
                     textChangedSample?.Play();
                     lastSamplePlayback = Time.Current;
                 }
 
-                LocalisableString textForStatus = getTextForStatus(matchmakingState.Stage);
+                LocalisableString textForStatus = getTextForStatus(stage);
 
                 if (string.IsNullOrEmpty(textForStatus.ToString()))
                 {
@@ -97,7 +114,7 @@ namespace osu.Game.Screens.OnlinePlay.Matchmaking.Match
                     .ScaleTo(1, 500, Easing.OutQuint);
 
                 text.Text = textForStatus;
-            });
+            }
 
             private LocalisableString getTextForStatus(MatchmakingStage status)
             {
@@ -123,6 +140,12 @@ namespace osu.Game.Screens.OnlinePlay.Matchmaking.Match
             protected override void Dispose(bool isDisposing)
             {
                 base.Dispose(isDisposing);
+
+                if (localState != null)
+                {
+                    localState.Stage.ValueChanged -= onLocalStageChanged;
+                    return;
+                }
 
                 if (client.IsNotNull())
                     client.MatchRoomStateChanged -= onMatchRoomStateChanged;
